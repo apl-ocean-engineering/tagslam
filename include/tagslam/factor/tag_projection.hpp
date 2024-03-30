@@ -13,10 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TAGSLAM__RELATIVE_POSE_PRIOR_HPP_
-#define TAGSLAM__RELATIVE_POSE_PRIOR_HPP_
+#ifndef TAGSLAM__FACTOR__TAG_PROJECTION_HPP_
+#define TAGSLAM__FACTOR__TAG_PROJECTION_HPP_
 
-#include <geometry_msgs/msg/point.hpp>
+#include <apriltag_msgs/msg/april_tag_detection.hpp>
 #include <tagslam/factor/factor.hpp>
 #include <tagslam/geometry.hpp>
 #include <tagslam/pose_with_noise.hpp>
@@ -36,7 +36,7 @@ public:
     uint64_t t = 0,
     const std::shared_ptr<const Camera> & cam = std::shared_ptr<Camera>(),
     const std::shared_ptr<const Tag> & tag = std::shared_ptr<Tag>(),
-    const geometry_msgs::msg::Point * imgCorn = NULL, double pixelNoise = 1.0,
+    const apriltag_msgs::msg::Point * imgCorn = NULL, double pixelNoise = 1.0,
     const string & name = "");
   // ------ inherited methods -----
   string getLabel() const override;
@@ -68,4 +68,4 @@ typedef std::shared_ptr<factor::TagProjection> TagProjectionFactorPtr;
 typedef std::shared_ptr<const factor::TagProjection>
   TagProjectionFactorConstPtr;
 }  // namespace tagslam
-#endif  // TAGSLAM__RELATIVE_POSE_PRIOR_HPP_
+#endif  // TAGSLAM__FACTOR__TAG_PROJECTION_HPP_

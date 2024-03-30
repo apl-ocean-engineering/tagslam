@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TAGSLAM__POSE_GTSAM_OPTIMIZER_HPP_
-#define TAGSLAM__POSE_GTSAM_OPTIMIZER_HPP_
+#ifndef TAGSLAM__GTSAM_OPTIMIZER_HPP_
+#define TAGSLAM__GTSAM_OPTIMIZER_HPP_
 
 #include <gtsam/linear/NoiseModel.h>
 #include <gtsam/nonlinear/ExpressionFactorGraph.h>
@@ -103,4 +103,4 @@ private:
   OptimizerMode mode_{SLOW};
 };
 }  // namespace tagslam
-#endif  // TAGSLAM__POSE_GTSAM_OPTIMIZER_HPP_
+#endif  // TAGSLAM__GTSAM_OPTIMIZER_HPP_

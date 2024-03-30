@@ -34,4 +34,4 @@ struct BodyDefaults
   double rotationNoise{1e-1};
 };
 }  // namespace tagslam
-#endif  // #define TAGSLAM__BODY_DEFAULTS_HPP_
+#endif  // TAGSLAM__BODY_DEFAULTS_HPP_

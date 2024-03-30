@@ -1,21 +1,29 @@
-#!/usr/bin/env python
-#------------------------------------------------------------------------------
-# read calibration files
+#!/usr/bin/env python3
+# -----------------------------------------------------------------------------
+# Copyright 2024 Bernd Pfrommer <bernd.pfrommer@gmail.com>
 #
-# 2019 Bernd Pfrommer
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 
-import rospy
-import argparse
-import copy
-import yaml
-import re
-import numpy as np
+# read calibration files
+
 import geometry_msgs
-import sensor_msgs
-import tf2_msgs
-import time
+import numpy as np
+from tf.transformations import identity_matrix
+from tf.transformations import quaternion_from_matrix
+from tf.transformations import rotation_matrix
+import yaml
 
-from tf.transformations import *
 
 def read_yaml(filename):
     with open(filename, 'r') as y:
@@ -24,26 +32,29 @@ def read_yaml(filename):
         except yaml.YAMLError as e:
             print(e)
 
+
 def matrix_to_tf(T):
-    q  = quaternion_from_matrix(T)
+    q = quaternion_from_matrix(T)
     tf = geometry_msgs.msg.Transform()
-    tf.translation.x = T[0,3]
-    tf.translation.y = T[1,3]
-    tf.translation.z = T[2,3]
+    tf.translation.x = T[0, 3]
+    tf.translation.y = T[1, 3]
+    tf.translation.z = T[2, 3]
     tf.rotation.x = q[0]
     tf.rotation.y = q[1]
     tf.rotation.z = q[2]
     tf.rotation.w = q[3]
     return tf
 
+
 def rvec_tvec_to_mat(rvec, tvec):
-    l = np.linalg.norm(rvec)
-    n = rvec/l if l > 1e-8 else np.array([1.0, 0.0, 0.0])
-    T = tf.transformations.rotation_matrix(l, n)
+    L = np.linalg.norm(rvec)
+    n = rvec / L if L > 1e-8 else np.array([1.0, 0.0, 0.0])
+    T = rotation_matrix(L, n)
     T[0:3, 3] = tvec
     return T
-    
-def read_calib(fname, use_imu_tf = False):
+
+
+def read_calib(fname, use_imu_tf=False):
     c = read_yaml(fname)
     tfmd = {}
     for i in c.items():
@@ -56,9 +67,9 @@ def read_calib(fname, use_imu_tf = False):
             T = identity_matrix()
         tfmd[name] = T
 
-    T = identity_matrix() # T_-1_w
+    T = identity_matrix()  # T_-1_w
     tfms = {}
-#    print tfmd
+    #    print tfmd
 
     for name in sorted(tfmd.keys()):
         # compute T_n_n-1 by premult T_n-1_w

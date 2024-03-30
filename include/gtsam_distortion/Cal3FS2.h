@@ -1,13 +1,20 @@
-/* -*-c++-*--------------------------------------------------------------------
- * GTSAM Copyright 2010, Georgia Tech Research Corporation,
- * Atlanta, Georgia 30332-0415
- * All Rights Reserved
- * Authors: Bernd Pfrommer, based on code by
- * Frank Dellaert, et al. (see THANKS for the full author list)
-
- * See LICENSE for the license information
-
- * -------------------------------------------------------------------------- */
+// -*-c++-*---------------------------------------------------------------------------------------
+//
+// Based on gtsam code by Frank Dellaert, et.al, Georgia Tech Research Corporation.
+//
+// Copyright 2024 Bernd Pfrommer <bernd.pfrommer@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 /**
  * @file Cal3FS2.h
@@ -19,6 +26,7 @@
 #pragma once
 
 #include <gtsam/geometry/Point2.h>
+
 #include <boost/shared_ptr.hpp>
 
 /**
@@ -38,12 +46,11 @@
  * y' = theta_d/r * y
  * p  = K * p'
  */
-class Cal3FS2 {
-
+class Cal3FS2
+{
 protected:
-
-  double fx_, fy_, u0_, v0_ ; // focal length,  and principal point
-  double k1_, k2_, k3_, k4_ ; // radial distortion coefficients of radtan model
+  double fx_, fy_, u0_, v0_;  // focal length,  and principal point
+  double k1_, k2_, k3_, k4_;  // radial distortion coefficients of radtan model
 
 public:
   enum { dimension = 8 };
@@ -54,9 +61,12 @@ public:
   /// Default Constructor with only unit focal length
   Cal3FS2() : fx_(1), fy_(1), u0_(0), v0_(0), k1_(0), k2_(0), k3_(0), k4_(0) {}
 
-  Cal3FS2(double fx, double fy, double u0, double v0,
-          double k1, double k2, double k3, double k4) :
-    fx_(fx), fy_(fy), u0_(u0), v0_(v0), k1_(k1), k2_(k2), k3_(k3), k4_(k4) {}
+  Cal3FS2(
+    double fx, double fy, double u0, double v0, double k1, double k2, double k3,
+    double k4)
+  : fx_(fx), fy_(fy), u0_(u0), v0_(v0), k1_(k1), k2_(k2), k3_(k3), k4_(k4)
+  {
+  }
 
   virtual ~Cal3FS2() {}
 
@@ -64,45 +74,45 @@ public:
   /// @name Advanced Constructors
   /// @{
 
-  Cal3FS2(const gtsam::Vector &v) ;
+  explicit Cal3FS2(const gtsam::Vector & v);
 
   /// @}
   /// @name Testable
   /// @{
 
   /// print with optional string
-  virtual void print(const std::string& s = "") const ;
+  virtual void print(const std::string & s = "") const;
 
   /// assert equality up to a tolerance
-  bool equals(const Cal3FS2& K, double tol = 10e-9) const;
+  bool equals(const Cal3FS2 & K, double tol = 10e-9) const;
 
   /// @}
   /// @name Standard Interface
   /// @{
 
   /// focal length x
-  inline double fx() const { return fx_;}
+  inline double fx() const { return fx_; }
 
   /// focal length x
-  inline double fy() const { return fy_;}
+  inline double fy() const { return fy_; }
 
   /// image center in x
-  inline double px() const { return u0_;}
+  inline double px() const { return u0_; }
 
   /// image center in y
-  inline double py() const { return v0_;}
+  inline double py() const { return v0_; }
 
   /// First distortion coefficient
-  inline double k1() const { return k1_;}
+  inline double k1() const { return k1_; }
 
   /// Second distortion coefficient
-  inline double k2() const { return k2_;}
+  inline double k2() const { return k2_; }
 
   /// Third distortion coefficient
-  inline double k3() const { return k3_;}
+  inline double k3() const { return k3_; }
 
   /// Fourth distortion coefficient
-  inline double k4() const { return k4_;}
+  inline double k4() const { return k4_; }
 
   /// return calibration matrix -- not really applicable
   gtsam::Matrix3 K() const;
@@ -118,13 +128,13 @@ public:
   /// @{
 
   /// Given delta vector, update calibration
-  Cal3FS2 retract(const gtsam::Vector& d) const;
+  Cal3FS2 retract(const gtsam::Vector & d) const;
 
   /// Given a different calibration, calculate update to obtain it
-  gtsam::Vector localCoordinates(const Cal3FS2& T2) const ;
+  gtsam::Vector localCoordinates(const Cal3FS2 & T2) const;
 
   /// Return dimensions of calibration manifold object
-  virtual size_t dim() const { return dimension; };
+  virtual size_t dim() const { return dimension; }
 
   /**
    * convert intrinsic coordinates xy to (distorted) image coordinates uv
@@ -133,56 +143,63 @@ public:
    * @param Dp optional 2*2 Jacobian wrpt intrinsic coordinates
    * @return point in (distorted) image coordinates
    */
-  gtsam::Point2 uncalibrate(const gtsam::Point2& p,
-                     gtsam::OptionalJacobian<2,8> Dcal = boost::none,
-                     gtsam::OptionalJacobian<2,2> Dp = boost::none) const ;
+  gtsam::Point2 uncalibrate(
+    const gtsam::Point2 & p, gtsam::OptionalJacobian<2, 8> Dcal = boost::none,
+    gtsam::OptionalJacobian<2, 2> Dp = boost::none) const;
 
   /// Convert (distorted) image coordinates uv to intrinsic coordinates xy
-  gtsam::Point2 calibrate(const gtsam::Point2& p, const double tol=1e-5) const;
+  gtsam::Point2 calibrate(
+    const gtsam::Point2 & p, const double tol = 1e-5) const;
 
   /// Derivative of uncalibrate wrpt intrinsic coordinates
-  gtsam::Matrix2 D2d_intrinsic(const gtsam::Point2& p) const ;
+  gtsam::Matrix2 D2d_intrinsic(const gtsam::Point2 & p) const;
 
   /// Derivative of uncalibrate wrpt the calibration parameters
-  gtsam::Matrix28 D2d_calibration(const gtsam::Point2& p) const ;
+  gtsam::Matrix28 D2d_calibration(const gtsam::Point2 & p) const;
 
   /// @}
   /// @name Clone
   /// @{
 
   /// @return a deep copy of this object
-  virtual boost::shared_ptr<Cal3FS2> clone() const {
+  virtual boost::shared_ptr<Cal3FS2> clone() const
+  {
     return boost::shared_ptr<Cal3FS2>(new Cal3FS2(*this));
   }
 
   /// @}
 
 private:
-
-  gtsam::Point2 uncalibrateNoIntrinsics(const gtsam::Point2& p) const;
+  gtsam::Point2 uncalibrateNoIntrinsics(const gtsam::Point2 & p) const;
   /// @name Advanced Interface
   /// @{
 
   /** Serialization function */
   friend class boost::serialization::access;
-  template<class Archive>
+  template <class Archive>
   void serialize(Archive & ar, const unsigned int /*version*/)
-    {
-      ar & BOOST_SERIALIZATION_NVP(fx_);
-      ar & BOOST_SERIALIZATION_NVP(fy_);
-      ar & BOOST_SERIALIZATION_NVP(u0_);
-      ar & BOOST_SERIALIZATION_NVP(v0_);
-      ar & BOOST_SERIALIZATION_NVP(k1_);
-      ar & BOOST_SERIALIZATION_NVP(k2_);
-      ar & BOOST_SERIALIZATION_NVP(k3_);
-      ar & BOOST_SERIALIZATION_NVP(k4_);
-    }
+  {
+    ar & BOOST_SERIALIZATION_NVP(fx_);
+    ar & BOOST_SERIALIZATION_NVP(fy_);
+    ar & BOOST_SERIALIZATION_NVP(u0_);
+    ar & BOOST_SERIALIZATION_NVP(v0_);
+    ar & BOOST_SERIALIZATION_NVP(k1_);
+    ar & BOOST_SERIALIZATION_NVP(k2_);
+    ar & BOOST_SERIALIZATION_NVP(k3_);
+    ar & BOOST_SERIALIZATION_NVP(k4_);
+  }
 
   /// @}
-
 };
 // This is really ugly, injecting stuff into gtsam's namespace!
-namespace gtsam {
-  template<> struct traits<Cal3FS2> : public gtsam::internal::Manifold<Cal3FS2> {};
-  template<> struct traits<const Cal3FS2> : public gtsam::internal::Manifold<Cal3FS2> {};
-}
+namespace gtsam
+{
+template <>
+struct traits<Cal3FS2> : public gtsam::internal::Manifold<Cal3FS2>
+{
+};
+template <>
+struct traits<const Cal3FS2> : public gtsam::internal::Manifold<Cal3FS2>
+{
+};
+}  // namespace gtsam

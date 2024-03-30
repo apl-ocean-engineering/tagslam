@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TAGSLAM__RELATIVE_POSE_PRIOR_HPP_
-#define TAGSLAM__RELATIVE_POSE_PRIOR_HPP_
+#ifndef TAGSLAM__FACTOR__RELATIVE_POSE_PRIOR_HPP_
+#define TAGSLAM__FACTOR__RELATIVE_POSE_PRIOR_HPP_
 
 #include <tagslam/factor/factor.hpp>
 #include <tagslam/pose_with_noise.hpp>
@@ -58,4 +58,4 @@ typedef std::shared_ptr<const factor::RelativePosePrior>
   RelativePosePriorFactorConstPtr;
 }  // namespace tagslam
 
-#endif  // TAGSLAM__RELATIVE_POSE_PRIOR_HPP_
+#endif  // TAGSLAM__FACTOR__RELATIVE_POSE_PRIOR_HPP_

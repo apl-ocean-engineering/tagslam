@@ -1,8 +1,19 @@
-/* -*-c++-*--------------------------------------------------------------------
- * 2018 Bernd Pfrommer bernd.pfrommer@gmail.com
- */
+// -*-c++-*---------------------------------------------------------------------------------------
+// Copyright 2024 Bernd Pfrommer <bernd.pfrommer@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-#include <XmlRpcException.h>
+#include <yaml-cpp/yaml.h>
 
 #include <fstream>
 #include <iomanip>
@@ -14,6 +25,10 @@ namespace tagslam
 {
 namespace measurements
 {
+static rclcpp::Logger get_logger()
+{
+  return (rclcpp::get_logger("coordinate"));
+}
 
 #define FMT(X, Y) std::fixed << std::setw(X) << std::setprecision(Y)
 
@@ -33,25 +48,25 @@ void Coordinate::writeDiagnostics(const GraphPtr & graph)
 }
 
 Coordinate::CoordinateMeasurementsPtr Coordinate::read(
-  XmlRpc::XmlRpcValue config, TagFactory * tagFactory)
+  const YAML::Node & config, TagFactory * tagFactory)
 {
-  if (!config.hasMember("coordinate_measurements")) {
-    ROS_INFO_STREAM("no coordinate measurements found!");
+  if (!config["coordinate_measurements"]) {
+    LOG_INFO("no coordinate measurements found!");
     return CoordinateMeasurementsPtr();
   }
   std::shared_ptr<measurements::Coordinate> m(new measurements::Coordinate());
-  XmlRpc::XmlRpcValue meas = config[std::string("coordinate_measurements")];
-  if (meas.getType() == XmlRpc::XmlRpcValue::TypeArray) {
+  const auto meas = config["coordinate_measurements"];
+  if (meas.IsSequence()) {
     auto fpts = factor::Coordinate::parse(meas, tagFactory);
-    for (const auto f : fpts) {
+    for (const auto & f : fpts) {
       if (!f->getTag()->getBody()->isStatic()) {
         BOMB_OUT("measured body must be static: " << *f);
       }
-      ROS_INFO_STREAM("found coordinate: " << *f);
+      LOG_INFO("found coordinate: " << *f);
       m->factors_.push_back(f);
     }
   } else {
-    ROS_INFO_STREAM("no coordinate measurements found!");
+    LOG_INFO("no coordinate measurements found!");
   }
   return (m);
 }

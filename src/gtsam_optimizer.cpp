@@ -38,7 +38,7 @@ static rclcpp::Logger get_logger()
 static std::shared_ptr<gtsam::ISAM2> make_isam2(OptimizerMode mode)
 {
   gtsam::ISAM2Params p;
-  //p.setEnableDetailedResults(true);
+  // p.setEnableDetailedResults(true);
   p.enableDetailedResults = true;
   switch (mode) {
     case SLOW:
@@ -93,7 +93,7 @@ void GTSAMOptimizer::setMode(OptimizerMode mode)
 std::shared_ptr<Cal3DS3> GTSAMOptimizer::getRadTanModel(
   const string & cname, const CameraIntrinsics & ci)
 {
-  // TODO: introduce camera ID and use lookup table!
+  // TODO(Bernd): introduce camera ID and use lookup table!
   auto it = radTanModelMap_.find(cname);
   if (it == radTanModelMap_.end()) {
     const auto & K = ci.getKVec();
@@ -103,7 +103,7 @@ std::shared_ptr<Cal3DS3> GTSAMOptimizer::getRadTanModel(
     dc[1] = D.size() > 1 ? D[1] : 0;
     double p1 = D.size() > 2 ? D[2] : 0;
     double p2 = D.size() > 3 ? D[3] : 0;
-    for (size_t i = 0; i < D.size(); i++) {
+    for (size_t i = 4; i < D.size(); i++) {
       dc[i - 2] = D[i];
     }
     it = radTanModelMap_
@@ -118,7 +118,7 @@ std::shared_ptr<Cal3DS3> GTSAMOptimizer::getRadTanModel(
 std::shared_ptr<Cal3FS2> GTSAMOptimizer::getEquiModel(
   const string & cname, const CameraIntrinsics & ci)
 {
-  // TODO: introduce camera ID and use lookup table!
+  // TODO(Bernd): introduce camera ID and use lookup table!
   auto it = equiModelMap_.find(cname);
   if (it == equiModelMap_.end()) {
     const auto & K = ci.getKVec();
@@ -162,7 +162,7 @@ static double proj(
 ValueKey GTSAMOptimizer::addPose(const Transform & p)
 {
   ValueKey key = generateKey();
-  //ROS_DEBUG_STREAM("optimizer: adding pose with key " << key);
+  // LOG_DEBUG("optimizer: adding pose with key " << key);
   newValues_.insert(key, gtsam_utils::to_gtsam(p));
   return (key);
 }
@@ -231,8 +231,8 @@ std::vector<FactorKey> GTSAMOptimizer::addTagProjectionFactor(
   const CameraIntrinsics & ci, double pixelNoise, ValueKey T_r_c,
   ValueKey T_w_r, ValueKey T_w_b, ValueKey T_b_o)
 {
-  //ROS_DEBUG_STREAM("gtsam: adding tag proj fac: " << T_r_c << " " <<
-  //T_w_r << " " << T_w_b << " " << T_b_o);
+  // LOG_DEBUG("gtsam: adding tag proj fac: " << T_r_c << " " <<
+  // T_w_r << " " << T_w_b << " " << T_b_o);
   std::vector<FactorKey> keys;
   keys.reserve(4);
   gtsam::Expression<gtsam::Pose3> T_b_o_fac(T_b_o);
@@ -363,7 +363,7 @@ double GTSAMOptimizer::doOptimize(double deltaError)
     }
     lastError_ = hasValidError ? *res.errorAfter : -1.0;
     values_ = isam2_->calculateEstimate();
-//#define DEBUG_BEFORE_AFTER
+
 #ifdef DEBUG_BEFORE_AFTER
     for (const auto & v : newValues_) {
       std::cout << "----- before: " << std::endl;
@@ -403,9 +403,9 @@ static void print_large_errors(
         std::cout << std::endl;
       }
     } else {
-      //std::cout << label << " SMALL ERROR: " << i->error(v) << std::endl;
-      //std::cout << label << " factor: " << std::endl;
-      //i->print();  std::cout <<  std::endl << std::endl;
+      // std::cout << label << " SMALL ERROR: " << i->error(v) << std::endl;
+      // std::cout << label << " factor: " << std::endl;
+      // i->print();  std::cout <<  std::endl << std::endl;
     }
   }
 }

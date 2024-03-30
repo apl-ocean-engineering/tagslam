@@ -1,8 +1,20 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+# -----------------------------------------------------------------------------
+# Copyright 2024 Bernd Pfrommer <bernd.pfrommer@gmail.com>
 #
-# script to align odometries vs each other, and compute ATE
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 
 import numpy as np
 import argparse
@@ -11,13 +23,9 @@ import rospy
 import math
 
 import tf_conversions.posemath as pm
-import numpy.linalg
-from collections import defaultdict
-from scipy.spatial.transform import Rotation as R
-from scipy.spatial.transform import Slerp
-from scipy.interpolate import RegularGridInterpolator
+
+
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 def align_umeyama(model, data):
     """Implementation of the paper: S. Umeyama, Least-Squares Estimation

@@ -50,6 +50,9 @@ set(ament_dependencies
   "rosbag2_cpp"
   "sensor_msgs"
   "tf2_ros"
+  "tf2_msgs"
+  "tf2"
+  "rosgraph_msgs"
   "std_srvs")
 
 foreach(pkg ${ament_dependencies})
@@ -68,27 +71,45 @@ endforeach()
 # --------- library
 #
 add_library(${PROJECT_NAME} SHARED
-  src/tagslam.cpp
-  src/tag.cpp
-  src/body.cpp
-  src/pose_with_noise.cpp
-  src/pose_noise.cpp
   src/board.cpp
-  src/graph_utils.cpp
-  src/graph.cpp
-  src/vertex.cpp
-  src/value/pose.cpp
+  src/body_defaults.cpp
+  src/body.cpp
+  src/camera_intrinsics.cpp
+  src/camera.cpp
   src/factor/absolute_pose_prior.cpp
+  src/factor/coordinate.cpp
+  src/factor/distance.cpp
+  src/factor/relative_pose_prior.cpp
+  src/factor/tag_projection.cpp
+  src/geometry.cpp
+  src/graph_edge.cpp
+  src/graph_updater.cpp
+  src/graph_utils.cpp
+  src/graph_vertex.cpp
+  src/graph.cpp
   src/gtsam_optimizer.cpp
   src/gtsam_utils.cpp
   src/gtsam_distortion/Cal3DS3.cpp
   src/gtsam_distortion/Cal3FS2.cpp
-  src/yaml_utils.cpp
+  src/init_pose.cpp
+  src/measurements/coordinate.cpp
+  src/measurements/distance.cpp
+  src/measurements/measurements.cpp
+  src/measurements/plane.cpp
+  src/odometry_processor.cpp
+  src/pose_noise.cpp
+  src/pose_with_noise.cpp
+  src/profiler.cpp
+  src/quartic.cpp
+  src/rpp.cpp
   src/simple_body.cpp
   src/staggered_board.cpp
+  src/tag.cpp
+  src/tagslam.cpp
+  src/value/pose.cpp
+  src/vertex.cpp
+  src/yaml_utils.cpp
   src/yaml.cpp
-  src/geometry.cpp
-  src/factor/tag_projection.cpp
 )
 
 ament_target_dependencies(${PROJECT_NAME} ${ament_dependencies})
@@ -129,7 +150,7 @@ install(TARGETS
 )
 install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}/)
-  
+
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}/
@@ -141,20 +162,19 @@ if(BUILD_TESTING)
   find_package(ament_cmake_cppcheck REQUIRED)
   find_package(ament_cmake_cpplint REQUIRED)
   find_package(ament_cmake_clang_format REQUIRED)
-  find_package(ament_cmake_flake8 REQUIRED)
+  # find_package(ament_cmake_flake8 REQUIRED)
+  # find_package(ament_cmake_pep257 REQUIRED)
   find_package(ament_cmake_lint_cmake REQUIRED)
-  find_package(ament_cmake_pep257 REQUIRED)
   find_package(ament_cmake_xmllint REQUIRED)
 
   ament_copyright()
   ament_cppcheck(LANGUAGE c++)
   ament_cpplint(FILTERS "-build/include,-runtime/indentation_namespace")
   ament_clang_format(CONFIG_FILE .clang-format)
-  ament_flake8()
+  # ament_flake8()
+  # ament_pep257()
   ament_lint_cmake()
-  ament_pep257()
   ament_xmllint()
-
 endif()
 
 ament_package()

@@ -106,7 +106,7 @@ std::vector<ValueKey> Graph::getOptKeysForFactor(
     }
     optKeys.push_back(findOptimizedPoseKey(vv));
   }
-  if (optKeys.size() != (size_t)numKeys) {
+  if (optKeys.size() != static_cast<size_t>(numKeys)) {
     BOMB_OUT(
       "wrong num values for " << info(fv) << ": " << optKeys.size()
                               << " expected: " << numKeys);

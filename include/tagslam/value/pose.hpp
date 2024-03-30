@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TAGSLAM__TAGSLAM__POSE_HPP_
-#define TAGSLAM__TAGSLAM__POSE_HPP_
+#ifndef TAGSLAM__VALUE__POSE_HPP_
+#define TAGSLAM__VALUE__POSE_HPP_
 
 #include <tagslam/pose_with_noise.hpp>
 #include <tagslam/value/value.hpp>
@@ -27,7 +27,8 @@ class Pose : public Value
 {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  Pose(const uint64_t t = 0, const std::string & name = "", bool icp = false)
+  explicit Pose(
+    const uint64_t t = 0, const std::string & name = "", bool icp = false)
   : Value(name, t), isCameraPose_(icp)
   {
   }
@@ -55,4 +56,4 @@ typedef std::shared_ptr<value::Pose> PoseValuePtr;
 typedef std::shared_ptr<const value::Pose> PoseValueConstPtr;
 }  // namespace tagslam
 
-#endif  // TAGSLAM__TAGSLAM__POSE_HPP_
+#endif  // TAGSLAM__VALUE__POSE_HPP_

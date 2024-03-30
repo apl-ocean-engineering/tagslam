@@ -28,7 +28,7 @@ namespace tagslam
 {
 struct SimpleBody : public Body
 {
-  SimpleBody(const std::string & n = std::string(""), bool iS = false)
+  explicit SimpleBody(const std::string & n = std::string(""), bool iS = false)
   : Body(n, iS)
   {
     type_ = "simple";
@@ -43,4 +43,4 @@ using SimpleBodyPtr = SimpleBody::SimpleBodyPtr;
 using SimpleBodyConstPtr = SimpleBody::SimpleBodyConstPtr;
 }  // namespace tagslam
 
-#endif  // SIMPLE_BODY_HPP_
+#endif  // TAGSLAM__SIMPLE_BODY_HPP_

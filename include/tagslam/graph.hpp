@@ -168,4 +168,4 @@ private:
 typedef std::shared_ptr<Graph> GraphPtr;
 typedef std::shared_ptr<const Graph> GraphConstPtr;
 }  // namespace tagslam
-#endif  // TAGSLAM__GRAPH_HPP__
+#endif  // TAGSLAM__GRAPH_HPP_

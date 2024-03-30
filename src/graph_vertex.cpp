@@ -14,15 +14,13 @@
 // limitations under the License.
 
 #include <tagslam/graph_vertex.hpp>
-p >
-
 #include <tagslam/vertex.hpp>
 
-  namespace tagslam
+namespace tagslam
 {
-  std::ostream & operator<<(std::ostream & os, const GraphVertex & v)
-  {
-    os << v->getLabel();
-    return (os);
-  }
+std::ostream & operator<<(std::ostream & os, const GraphVertex & v)
+{
+  os << v->getLabel();
+  return (os);
+}
 }  // namespace tagslam

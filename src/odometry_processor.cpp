@@ -13,24 +13,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <geometry_msgs/Quaternion.h>
-
 #include <fstream>
+#include <geometry_msgs/msg/quaternion.hpp>
 #include <tagslam/geometry.hpp>
+#include <tagslam/logging.hpp>
 #include <tagslam/odometry_processor.hpp>
 
 namespace tagslam
 {
-using Odometry = nav_msgs::Odometry;
-using OdometryConstPtr = nav_msgs::OdometryConstPtr;
-//std::ofstream debug_file("odom_debug.txt");
+
+static rclcpp::Logger get_logger()
+{
+  return (rclcpp::get_logger("odometry_processor"));
+}
+using Odometry = nav_msgs::msg::Odometry;
+using OdometryConstPtr = Odometry::ConstSharedPtr;
 
 OdometryProcessor::OdometryProcessor(
-  ros::NodeHandle & nh, const BodyConstPtr & body)
+  rclcpp::Node * node, const BodyConstPtr & body)
 : body_(body)
 {
   pub_ =
-    nh.advertise<nav_msgs::Odometry>("raw_odom/body_" + body->getName(), 5);
+    node->create_publisher<Odometry>("raw_odom/body_" + body->getName(), 5);
+
   accelerationNoiseMin_ = body->getOdomAccelerationNoiseMin();
   angularAccelerationNoiseMin_ = body->getOdomAngularAccelerationNoiseMin();
   accelerationNoiseMax_ = body->getOdomAccelerationNoiseMax();
@@ -42,16 +47,16 @@ OdometryProcessor::OdometryProcessor(
 
 static Transform to_pose(const OdometryConstPtr & odom)
 {
-  const geometry_msgs::Quaternion & q = odom->pose.pose.orientation;
-  const geometry_msgs::Point & p = odom->pose.pose.position;
+  const auto & q = odom->pose.pose.orientation;
+  const auto & p = odom->pose.pose.position;
   return (make_transform(
     Eigen::Quaterniond(q.w, q.x, q.y, q.z), Point3d(p.x, p.y, p.z)));
 }
 
 PoseNoiseConstPtr OdometryProcessor::makeAdaptiveNoise(
-  const ros::Time & t, const Transform & deltaPose)
+  const uint64_t t, const Transform & deltaPose)
 {
-  const double dt = std::max((t - time_).toSec(), 0.001);
+  const double dt = std::max((t - time_) * 1e-9, 0.001);
   const double dt2 = dt * dt;
   const double dtinv = 1.0 / dt;
   const Eigen::Vector3d dx = deltaPose.translation();
@@ -87,14 +92,13 @@ PoseNoiseConstPtr OdometryProcessor::makeAdaptiveNoise(
   const double posNoise = std::min(
     std::max(dpos, accelerationNoiseMin_ * dt2), accelerationNoiseMax_ * dt2);
 
-  //debug_file <<  t  << " " << posNoise << " " << accelerationNoiseMin_ * dt2
-  //<< " " << accelerationNoiseMax_ * dt2 << std::endl;
+  // debug_file <<  t  << " " << posNoise << " " << accelerationNoiseMin_ * dt2
+  // << " " << accelerationNoiseMax_ * dt2 << std::endl;
   PoseNoiseConstPtr pn(new PoseNoise(PoseNoise::make(angNoise, posNoise)));
   return (pn);
 }
 
-void OdometryProcessor::updateStatistics(
-  const ros::Time & t, const Transform & d)
+void OdometryProcessor::updateStatistics(uint64_t t, const Transform & d)
 {
   const double l2 = d.translation().squaredNorm();
   Eigen::AngleAxisd aa;  // angle-axis
@@ -110,32 +114,33 @@ void OdometryProcessor::updateStatistics(
   angSum_ += a;
   ang2Sum_ += a * a;
   count_++;
-  ROS_DEBUG_STREAM("odom: " << a << " l: " << l);
+  LOG_DEBUG("odom: " << a << " l: " << l);
 }
 
 void OdometryProcessor::finalize() const
 {
-  const double cinv = (count_ > 0) ? (1.0 / (double)count_) : 0.0;
+  const double dcount = static_cast<double>(count_);
+  const double cinv = (count_ > 0) ? (1.0 / dcount) : 0.0;
   const double lavg = lenSum_ * cinv;
-  const double cov = cinv * (len2Sum_ - lavg * lavg * (double)count_);
+  const double cov = cinv * (len2Sum_ - lavg * lavg * dcount);
   const double aavg = angSum_ * cinv;
-  const double acov = cinv * (ang2Sum_ - aavg * aavg * (double)count_);
-  ROS_INFO_STREAM("---- odom statistics: ");
-  ROS_INFO_STREAM("translation: " << lavg << " +- " << std::sqrt(cov));
-  ROS_INFO_STREAM("max: " << lenMax_ << " at time: " << lenMaxT_);
-  ROS_INFO_STREAM("rotation: " << aavg << " +- " << std::sqrt(acov));
+  const double acov = cinv * (ang2Sum_ - aavg * aavg * dcount);
+  LOG_INFO("---- odom statistics: ");
+  LOG_INFO("translation: " << lavg << " +- " << std::sqrt(cov));
+  LOG_INFO("max: " << lenMax_ << " at time: " << lenMaxT_);
+  LOG_INFO("rotation: " << aavg << " +- " << std::sqrt(acov));
 }
 
 void OdometryProcessor::process(
-  const ros::Time & t, Graph * graph, const OdometryConstPtr & msg,
+  uint64_t t, Graph * graph, const OdometryConstPtr & msg,
   std::vector<VertexDesc> * factors)
 {
   auto msg2 = *msg;
   msg2.header.frame_id = "map";
-  msg2.header.stamp = t;
-  pub_.publish(msg2);
+  msg2.header.stamp = rclcpp::Time(t, RCL_ROS_TIME);
+  pub_->publish(msg2);
   Transform newPose = to_pose(msg);
-  if (time_ == ros::Time(0)) {
+  if (time_ == 0) {
     lastOmega_ = Eigen::Vector3d(0, 0, 0);
     lastVelocity_ = Eigen::Vector3d(0, 0, 0);
   } else {
@@ -158,19 +163,19 @@ void OdometryProcessor::process(
 }
 
 VertexDesc OdometryProcessor::add_body_pose_delta(
-  Graph * graph, const ros::Time & tPrev, const ros::Time & tCurr,
-  const BodyConstPtr & body, const PoseWithNoise & deltaPose)
+  Graph * graph, uint64_t tPrev, uint64_t tCurr, const BodyConstPtr & body,
+  const PoseWithNoise & deltaPose)
 {
   Transform prevPose;
   const std::string name = Graph::body_name(body->getName());
   const VertexDesc pp = graph->findPose(tPrev, name);
   const VertexDesc cp = graph->findPose(tCurr, name);
   if (!Graph::is_valid(pp)) {
-    ROS_DEBUG_STREAM("adding previous pose for " << name << " " << tPrev);
+    LOG_DEBUG("adding previous pose for " << name << " " << tPrev);
     graph->addPose(tPrev, name, false);
   }
   if (!Graph::is_valid(cp)) {
-    ROS_DEBUG_STREAM("adding current pose for " << name << " " << tCurr);
+    LOG_DEBUG("adding current pose for " << name << " " << tCurr);
     graph->addPose(tCurr, name, false);
   }
   RelativePosePriorFactorPtr fac(

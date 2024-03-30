@@ -29,7 +29,7 @@ public:
   typedef std::shared_ptr<Board> BoardPtr;
   typedef std::shared_ptr<const Board> BoardConstPtr;
 
-  Board(const string & n = string(""), bool iS = false) : Body(n, iS)
+  explicit Board(const string & n = string(""), bool iS = false) : Body(n, iS)
   {
     type_ = "board";
   }

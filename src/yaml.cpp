@@ -95,7 +95,6 @@ PoseWithNoise parse(const YAML::Node & conf, const std::string & key)
     return (PoseWithNoise(pose, noise, true));
   } catch (const std::runtime_error & e) {
     LOG_ERROR("error parsing: " << key);
-    //xml.write(std::cerr); std::cerr << std::endl;
     throw(e);
   }
 }
@@ -121,9 +120,18 @@ uint64_t parse(const YAML::Node & conf, const std::string & key)
     return (t);
   } catch (const std::runtime_error & e) {
     LOG_ERROR("error parsing: " << key);
-    //conf.write(std::cerr); std::cerr << std::endl;
     throw(e);
   }
 }
+
+uint64_t parse_time(
+  const YAML::Node & conf, const std::string & key, uint64_t def)
+{
+  if (!conf[key]) {
+    return (def);
+  }
+  return (static_cast<uint64_t>(conf[key].as<double>() * 1e9));
+}
+
 }  // namespace yaml
 }  // namespace tagslam

@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TAGSLAM__COORDINATE_HPP_
-#define TAGSLAM__COORDINATE_HPP_
+#ifndef TAGSLAM__FACTOR__COORDINATE_HPP_
+#define TAGSLAM__FACTOR__COORDINATE_HPP_
 
 #include <memory>
 #include <tagslam/factor/factor.hpp>
@@ -89,4 +89,4 @@ typedef factor::Coordinate::CoordinateFactorPtr CoordinateFactorPtr;
 typedef factor::Coordinate::CoordinateFactorConstPtr CoordinateFactorConstPtr;
 typedef factor::Coordinate::CoordinateFactorPtrVec CoordinateFactorPtrVec;
 }  // namespace tagslam
-#endif  //  TAGSLAM__COORDINATE_HPP_
+#endif  //  TAGSLAM__FACTOR__COORDINATE_HPP_

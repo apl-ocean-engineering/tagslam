@@ -29,7 +29,10 @@ namespace tagslam
 class OptimizerException : public std::runtime_error
 {
 public:
-  OptimizerException(const std::string & what) : std::runtime_error(what){};
+  explicit OptimizerException(const std::string & what)
+  : std::runtime_error(what)
+  {
+  }
 };
 typedef std::map<FactorKey, double> KeyToErrorMap;
 class Optimizer
@@ -37,7 +40,7 @@ class Optimizer
 public:
   using string = std::string;
   Optimizer() {}
-  virtual ~Optimizer(){};
+  virtual ~Optimizer() {}
 
   virtual double optimize(double deltaError) = 0;
   virtual double optimizeFull(bool force = false) = 0;

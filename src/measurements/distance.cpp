@@ -1,8 +1,20 @@
-/* -*-c++-*--------------------------------------------------------------------
- * 2018 Bernd Pfrommer bernd.pfrommer@gmail.com
- */
 
-#include <XmlRpcException.h>
+// -*-c++-*---------------------------------------------------------------------------------------
+// Copyright 2024 Bernd Pfrommer <bernd.pfrommer@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include <yaml-cpp/yaml.h>
 
 #include <fstream>
 #include <iomanip>
@@ -14,6 +26,7 @@ namespace tagslam
 {
 namespace measurements
 {
+static rclcpp::Logger get_logger() { return (rclcpp::get_logger("distance")); }
 
 #define FMT(X, Y) std::fixed << std::setw(X) << std::setprecision(Y)
 
@@ -33,27 +46,27 @@ void Distance::writeDiagnostics(const GraphPtr & graph)
 }
 
 Distance::DistanceMeasurementsPtr Distance::read(
-  XmlRpc::XmlRpcValue config, TagFactory * tagFactory)
+  const YAML::Node & config, TagFactory * tagFactory)
 {
-  if (!config.hasMember("distance_measurements")) {
-    ROS_INFO_STREAM("no distance measurements found!");
+  if (!config["distance_measurements"]) {
+    LOG_INFO("no distance measurements found!");
     return DistanceMeasurementsPtr();
   }
   std::shared_ptr<measurements::Distance> m(new measurements::Distance());
-  XmlRpc::XmlRpcValue meas = config[std::string("distance_measurements")];
-  if (meas.getType() == XmlRpc::XmlRpcValue::TypeArray) {
+  const auto meas = config[std::string("distance_measurements")];
+  if (meas.IsSequence()) {
     auto factors = factor::Distance::parse(meas, tagFactory);
-    for (const auto f : factors) {
+    for (const auto & f : factors) {
       if (
         !f->getTag(0)->getBody()->isStatic() ||
         !f->getTag(1)->getBody()->isStatic()) {
         BOMB_OUT("measured bodies must be static: " << *f);
       }
-      ROS_INFO_STREAM("found distance: " << *f);
+      LOG_INFO("found distance: " << *f);
       m->factors_.push_back(f);
     }
   } else {
-    ROS_INFO_STREAM("no distance measurements found!");
+    LOG_INFO("no distance measurements found!");
   }
   return (m);
 }

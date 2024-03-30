@@ -14,31 +14,32 @@
 // limitations under the License.
 
 #include <tagslam/body_defaults.hpp>
-p >
-
-#include <XmlRpcException.h>
-
 #include <tagslam/logging.hpp>
-#include <tagslam/xml.hpp>
+#include <tagslam/yaml.hpp>
 
-  namespace tagslam
+namespace tagslam
 {
-  std::shared_ptr<BodyDefaults> s_ptr;
+static rclcpp::Logger get_logger()
+{
+  return (rclcpp::get_logger("body_defaults"));
+}
 
-  std::shared_ptr<BodyDefaults> BodyDefaults::instance() { return (s_ptr); }
-  void BodyDefaults::parse(XmlRpc::XmlRpcValue & config)
-  {
-    if (!config.hasMember("body_defaults")) {
-      BOMB_OUT("no body defaults found!");
-    }
-    try {
-      XmlRpc::XmlRpcValue def = config["body_defaults"];
-      const double pn = xml::parse<double>(def, "position_noise");
-      const double rn = xml::parse<double>(def, "rotation_noise");
-      s_ptr.reset(new BodyDefaults(pn, rn));
-    } catch (const XmlRpc::XmlRpcException & e) {
-      BOMB_OUT("error parsing body defaults!");
-    }
+std::shared_ptr<BodyDefaults> s_ptr;
+
+std::shared_ptr<BodyDefaults> BodyDefaults::instance() { return (s_ptr); }
+void BodyDefaults::parse(const YAML::Node & config)
+{
+  if (config["body_defaults"]) {
+    BOMB_OUT("no body defaults found!");
   }
+  try {
+    const auto def = config["body_defaults"];
+    const double pn = yaml::parse<double>(def, "position_noise");
+    const double rn = yaml::parse<double>(def, "rotation_noise");
+    s_ptr.reset(new BodyDefaults(pn, rn));
+  } catch (const std::runtime_error & e) {
+    BOMB_OUT("error parsing body defaults: " << e.what());
+  }
+}
 
 }  // namespace tagslam

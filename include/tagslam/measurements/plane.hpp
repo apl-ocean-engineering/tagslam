@@ -13,12 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef TAGSLAM__MEASUREMENTS__PLANE_HPP_
+#define TAGSLAM__MEASUREMENTS__PLANE_HPP_
 
 #include <tagslam/geometry.hpp>
 #include <tagslam/measurements/measurements.hpp>
 #include <tagslam/vertex.hpp>
 #include <vector>
+
+namespace YAML
+{
+class Node;  // forward decl
+}
 
 namespace tagslam
 {
@@ -32,8 +38,7 @@ public:
   void writeDiagnostics(const GraphPtr & graph) override;
 
   // static functions
-  static PlaneMeasurementsPtr read(
-    XmlRpc::XmlRpcValue config, TagFactory * fac);
+  static PlaneMeasurementsPtr read(const YAML::Node & config, TagFactory * fac);
 
 private:
   // static functions
@@ -43,3 +48,5 @@ private:
 };
 }  // namespace measurements
 }  // namespace tagslam
+
+#endif  // TAGSLAM__MEASUREMENTS__PLANE_HPP_

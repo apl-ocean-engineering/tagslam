@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TAGSLAM__MEASUREMENTS_HPP_
-#define TAGSLAM__MEASUREMENTS_HPP_
+#ifndef TAGSLAM__MEASUREMENTS__MEASUREMENTS_HPP_
+#define TAGSLAM__MEASUREMENTS__MEASUREMENTS_HPP_
 
 #include <memory>
 #include <tagslam/graph.hpp>
@@ -64,4 +64,4 @@ std::vector<MeasurementsPtr> read_all(
 typedef measurements::MeasurementsPtr MeasurementsPtr;
 typedef measurements::MeasurementsConstPtr MeasurementsConstPtr;
 }  // namespace tagslam
-#endif  // TAGSLAM__MEASUREMENTS_HPP_
+#endif  // TAGSLAM__MEASUREMENTS__MEASUREMENTS_HPP_

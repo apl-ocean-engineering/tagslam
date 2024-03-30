@@ -13,25 +13,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <boost/range/irange.hpp>
+#include <yaml-cpp/yaml.h>
+
 #include <sstream>
 #include <string>
 #include <tagslam/body.hpp>
 #include <tagslam/factor/coordinate.hpp>
 #include <tagslam/graph.hpp>
 #include <tagslam/logging.hpp>
-#include <tagslam/xml.hpp>
+#include <tagslam/yaml.hpp>
 
 namespace tagslam
 {
 namespace factor
 {
-using boost::irange;
+static rclcpp::Logger get_logger()
+{
+  return (rclcpp::get_logger("coordinate_factor"));
+}
 
 Coordinate::Coordinate(
   double len, double noise, const Point3d & direction, const int corn,
   const TagConstPtr & tag, const string & name)
-: Factor(name, ros::Time(0)),
+: Factor(name, 0ULL),
   length_(len),
   noise_(noise),
   direction_(direction),
@@ -42,7 +46,7 @@ Coordinate::Coordinate(
 
 VertexDesc Coordinate::addToGraph(const VertexPtr & vp, Graph * g) const
 {
-  const ros::Time t0 = ros::Time(0);
+  const uint64_t t0{0ULL};
   const VertexDesc vtp = g->findTagPose(getTag()->getId());
   checkIfValid(vtp, "no tag pose found");
   const VertexDesc vbp = g->findBodyPose(t0, getTag()->getBody()->getName());
@@ -77,20 +81,20 @@ const Eigen::Vector3d Coordinate::getCorner() const
 }
 
 CoordinateFactorPtr Coordinate::parse(
-  const string & name, XmlRpc::XmlRpcValue meas, TagFactory * tagFactory)
+  const string & name, const YAML::Node & meas, TagFactory * tagFactory)
 {
   int tag(-1), c(-1);
   double len(-1e10), noise(-1);
   Eigen::Vector3d dir(0.0, 0.0, 0.0);
   try {
-    tag = xml::parse<int>(meas, "tag");
-    c = xml::parse<int>(meas, "corner");
-    len = xml::parse<double>(meas, "length");
-    noise = xml::parse<double>(meas, "noise");
+    tag = yaml::parse<int>(meas, "tag");
+    c = yaml::parse<int>(meas, "corner");
+    len = yaml::parse<double>(meas, "length");
+    noise = yaml::parse<double>(meas, "noise");
     dir =
-      make_point(xml::parse_container<std::vector<double>>(meas, "direction"));
-  } catch (const XmlRpc::XmlRpcException & e) {
-    BOMB_OUT("error parsing measurement: " << name);
+      make_point(yaml::parse_container<std::vector<double>>(meas, "direction"));
+  } catch (const std::runtime_error & e) {
+    BOMB_OUT("error parsing measurement: " << name << ": " << e.what());
   }
   if (std::abs(dir.norm() - 1.0) > 1e-5) {
     BOMB_OUT("measurement " + name + " has non-unit direction");
@@ -99,7 +103,7 @@ CoordinateFactorPtr Coordinate::parse(
   if (tag >= 0 && c >= 0 && len > -1e10 && noise > 0) {
     TagConstPtr tagPtr = tagFactory->findTag(tag);
     if (!tagPtr) {
-      ROS_WARN_STREAM("ignoring unknown measured tag: " << name);
+      LOG_WARN("ignoring unknown measured tag: " << name);
       return CoordinateFactorPtr();
     }
     fp.reset(new factor::Coordinate(len, noise, dir, c, tagPtr, name));
@@ -110,22 +114,20 @@ CoordinateFactorPtr Coordinate::parse(
 }
 
 CoordinateFactorPtrVec Coordinate::parse(
-  XmlRpc::XmlRpcValue meas, TagFactory * tagFactory)
+  const YAML::Node & meas, TagFactory * tagFactory)
 {
   CoordinateFactorPtrVec fv;
-  if (meas.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+  if (!meas.IsSequence()) {
     BOMB_OUT("invalid node type for coordinate measurements!");
   }
-  for (const auto i : irange(0, meas.size())) {
-    if (meas[i].getType() != XmlRpc::XmlRpcValue::TypeStruct) continue;
-    for (XmlRpc::XmlRpcValue::iterator it = meas[i].begin();
-         it != meas[i].end(); ++it) {
-      if (it->second.getType() != XmlRpc::XmlRpcValue::TypeStruct) {
-        continue;
-      }
-      CoordinateFactorPtr d = parse(it->first, it->second, tagFactory);
-      if (d) {
-        fv.push_back(d);
+  for (size_t i = 0; i < meas.size(); i++) {
+    if (!meas[i].IsMap()) continue;
+    for (const auto & m : meas[i]) {
+      if (m.IsMap()) {
+        CoordinateFactorPtr d = parse(m.Tag(), m, tagFactory);
+        if (d) {
+          fv.push_back(d);
+        }
       }
     }
   }

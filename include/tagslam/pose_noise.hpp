@@ -27,8 +27,11 @@ public:
   typedef Eigen::Matrix<double, 6, 6> Matrix6d;
   typedef Eigen::Matrix<double, 6, 1> Vector6d;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  PoseNoise(const Matrix6d & n = Matrix6d::Identity(), bool isDiag = false)
-  : noise_(n), isDiagonal_(isDiag){};
+  explicit PoseNoise(
+    const Matrix6d & n = Matrix6d::Identity(), bool isDiag = false)
+  : noise_(n), isDiagonal_(isDiag)
+  {
+  }
   Eigen::Matrix<double, 6, 1> getDiagonal() const;
   const Matrix6d getCovarianceMatrix() const;
   bool getIsDiagonal() const { return (isDiagonal_); }

@@ -149,7 +149,12 @@ C parse_container(
   return (parse_container<C>(node, key));
 }
 
+// parse rostime as uint64_t in format sec.nanoseconds (double)
+
+uint64_t parse_time(
+  const YAML::Node & node, const std::string & key, uint64_t def);
+
 }  // namespace yaml
 }  // namespace tagslam
 
-#endif
+#endif  // TAGSLAM__YAML_HPP_

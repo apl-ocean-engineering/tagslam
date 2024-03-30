@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TAGSLAM__FACTOR_HPP_
-#define TAGSLAM__FACTOR_HPP_
+#ifndef TAGSLAM__FACTOR__FACTOR_HPP_
+#define TAGSLAM__FACTOR__FACTOR_HPP_
 
 #include <string>
 #include <tagslam/factor_key.hpp>
@@ -28,7 +28,9 @@ using std::string;
 class Factor : public Vertex
 {
 public:
-  Factor(const string & s = "", uint64_t t = 0) : Vertex(s, "box", t) {}
+  explicit Factor(const string & s = "", uint64_t t = 0) : Vertex(s, "box", t)
+  {
+  }
   virtual ~Factor() {}
   virtual void addToOptimizer(Graph * g) const = 0;
   virtual bool establishesValues() const = 0;
@@ -55,4 +57,4 @@ typedef std::shared_ptr<factor::Factor> FactorPtr;
 typedef std::shared_ptr<const factor::Factor> FactorConstPtr;
 }  // namespace tagslam
 
-#endif  // TAGSLAM__FACTOR_HPP_
+#endif  // TAGSLAM__FACTOR__FACTOR_HPP_

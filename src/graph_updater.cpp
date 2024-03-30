@@ -17,15 +17,21 @@
 #include <fstream>
 #include <tagslam/camera.hpp>
 #include <tagslam/factor/relative_pose_prior.hpp>
+#include <tagslam/factor/tag_projection.hpp>
 #include <tagslam/graph_updater.hpp>
 #include <tagslam/graph_utils.hpp>
 #include <tagslam/init_pose.hpp>
 #include <tagslam/logging.hpp>
 #include <tagslam/tag.hpp>
-#include <tagslam/xml.hpp>
+#include <tagslam/yaml.hpp>
 
 namespace tagslam
 {
+static rclcpp::Logger get_logger()
+{
+  return (rclcpp::get_logger("graph_updater"));
+}
+
 typedef GraphUpdater::VertexDeque VertexDeque;
 
 static bool contains(const std::deque<VertexDesc> & c, const VertexDesc & v)
@@ -59,10 +65,8 @@ static int examine_connected_values(
     ValueConstPtr vp = std::dynamic_pointer_cast<const value::Value>(vvp);
     numEdges++;
     if ((vp && graph.isOptimized(vv)) || covered.values.count(vv) != 0) {
-      //ROS_DEBUG_STREAM("   pose is optimized: " << graph.info(vv));
       numValid++;
     } else {
-      //ROS_DEBUG_STREAM("   pose is unoptimized: " << graph.info(vv));
       *valueVertex = vv;
     }
     values->push_back(vv);
@@ -93,7 +97,6 @@ void GraphUpdater::examine(
 {
   // "covered" has the factors and values that are already contained
   // in one of the subgraphs explored previously
-  //ROS_DEBUG_STREAM("examining factor: " << graph->info(fac));
   VertexDesc valueVertex;
   VertexDeque values;
   int numMissing =
@@ -102,7 +105,7 @@ void GraphUpdater::examine(
     // establishes new value, let's explore the new
     VertexConstPtr vt = graph->getVertex(valueVertex);
     ValueConstPtr vp = std::dynamic_pointer_cast<const value::Value>(vt);
-    ROS_DEBUG_STREAM(
+    LOG_DEBUG(
       " factor " << graph->info(fac)
                  << " establishes new value: " << vp->getLabel());
     auto & ff = covered->factors;
@@ -112,7 +115,7 @@ void GraphUpdater::examine(
     }
     for (const auto vv : values) {
       newSubGraph->values.insert(vv);
-      //ROS_INFO_STREAM("  adding new corresponding values: " << info(vv));
+      // LOG_INFO("  adding new corresponding values: " << info(vv));
       covered->values.insert(vv);
     }
     VertexVec connFac = graph->getConnected(valueVertex);
@@ -121,14 +124,13 @@ void GraphUpdater::examine(
       FactorConstPtr fp = std::dynamic_pointer_cast<const factor::Factor>(fvp);
       if (fp) {
         if (fv != fac) {  // no connections back
-          ROS_DEBUG_STREAM(
-            "  " << vp->getLabel() << " activates " << fp->getLabel());
+          LOG_DEBUG("  " << vp->getLabel() << " activates " << fp->getLabel());
           if (fp->getTime() == t || fp->getTime() == 0) {
             factorsToExamine->push_front(fv);
           } else {
             TimeToVertexesMap::iterator it = oldFactors_.find(fp->getTime());
             if (it == oldFactors_.end()) {
-              ROS_DEBUG_STREAM("   first vertex at time: " << fp->getTime());
+              LOG_DEBUG("   first vertex at time: " << fp->getTime());
               it = oldFactors_
                      .insert(TimeToVertexesMap::value_type(
                        fp->getTime(), VertexVec()))
@@ -136,11 +138,10 @@ void GraphUpdater::examine(
             }
             auto & c = it->second;
             if (!contains(c, fv)) {
-              ROS_DEBUG_STREAM("   remembering factor " << fp->getLabel());
+              LOG_DEBUG("   remembering factor " << fp->getLabel());
               c.push_back(fv);
             } else {
-              ROS_DEBUG_STREAM(
-                "   already remembered factor " << fp->getLabel());
+              LOG_DEBUG("   already remembered factor " << fp->getLabel());
             }
           }
         }
@@ -149,8 +150,7 @@ void GraphUpdater::examine(
   } else if (numMissing == 0) {
     // this factor does not establish a new value, but
     // provides an additional measurement on existing ones.
-    ROS_DEBUG_STREAM(
-      " factor provides additional measurement: " << graph->info(fac));
+    LOG_DEBUG(" factor provides additional measurement: " << graph->info(fac));
     auto & ff = covered->factors;
     if (std::find(ff.begin(), ff.end(), fac) == ff.end()) {
       ff.push_back(fac);
@@ -167,8 +167,7 @@ void GraphUpdater::examine(
       }
     }
   } else {
-    ROS_DEBUG_STREAM(
-      " factor does not establish new values: " << graph->info(fac));
+    LOG_DEBUG(" factor does not establish new values: " << graph->info(fac));
   }
 }
 
@@ -193,10 +192,10 @@ std::vector<VertexDeque> GraphUpdater::findSubgraphs(
 {
   profiler_.reset("findSubGraphs");
   std::vector<VertexDeque> sv;
-  ROS_DEBUG_STREAM("===================== finding subgraphs for t = " << t);
+  LOG_DEBUG("===================== finding subgraphs for t = " << t);
   // first look over the new factors
   for (const auto & fac : facs) {
-    ROS_DEBUG_STREAM(
+    LOG_DEBUG(
       " ----- exploring new subgraph starting at: " << graph->info(fac));
     if (!contains(found->factors, fac)) {
       // this is a new factor that has not been explored
@@ -222,13 +221,13 @@ static int find_connected_poses(
     if (!pp) {
       BOMB_OUT("vertex is no pose: " << vv);
     }
-    //ROS_DEBUG_STREAM(" factor attached value: " << pp->getLabel());
+    // LOG_DEBUG(" factor attached value: " << pp->getLabel());
     if (!graph.isOptimized(vv)) {
       missingIdx = edgeNum;
       numMissing++;
-      //ROS_DEBUG_STREAM(" missing value: " << pp->getLabel());
+      // LOG_DEBUG(" missing value: " << pp->getLabel());
     } else {
-      //ROS_DEBUG_STREAM(" valid value: " << pp->getLabel());
+      // LOG_DEBUG(" valid value: " << pp->getLabel());
     }
     edgeNum++;
   }
@@ -273,21 +272,21 @@ static bool set_value_from_tag_projection(
       const Transform poseDiff = T_c_o * Test_c_o.inverse();
       Eigen::AngleAxisd aa;
       aa.fromRotationMatrix(poseDiff.rotation());
-      ROS_DEBUG_STREAM(
+      LOG_DEBUG(
         "dup factor with mismatch angle: " << aa.angle() << " len: "
                                            << poseDiff.translation().norm());
       return (true);
       break;
     }
     default: {
-      ROS_DEBUG_STREAM(
+      LOG_DEBUG(
         "factor has multiple missing values: " << g->getVertex(v)->getLabel());
       return (false);
       break;
     }
   }
-  ROS_DEBUG_STREAM("tag proj setting value of " << g->info(T[idx]));
-  ROS_DEBUG_STREAM("set pose: " << std::endl << tf);
+  LOG_DEBUG("tag proj setting value of " << g->info(T[idx]));
+  LOG_DEBUG("set pose: " << std::endl << tf);
   return (true);
 }
 
@@ -312,18 +311,18 @@ static bool set_value_from_relative_pose_prior(
       break;
     }
     case -1: {
-      ROS_DEBUG_STREAM("relative pose factor has no missing values!");
+      LOG_DEBUG("relative pose factor has no missing values!");
       return (true);
       break;
     }
     default: {
-      ROS_DEBUG_STREAM("relative factor has multiple missing values!");
+      LOG_DEBUG("relative factor has multiple missing values!");
       return (false);
       break;
     }
   }
-  ROS_DEBUG_STREAM("rel pos setting value of " << g->info(T[idx]));
-  ROS_DEBUG_STREAM("set pose: " << std::endl << tf);
+  LOG_DEBUG("rel pos setting value of " << g->info(T[idx]));
+  LOG_DEBUG("set pose: " << std::endl << tf);
   return (true);
 }
 
@@ -347,7 +346,7 @@ static bool init_from_abs_pose_prior(Graph * g, const VertexDesc & v)
     VertexVec T;
     int idx = find_connected_poses(*g, v, &T);
     if (idx == 0) {
-      ROS_DEBUG_STREAM("using abs pose prior: " << g->info(v));
+      LOG_DEBUG("using abs pose prior: " << g->info(v));
       g->getPoseVertex(T[idx])->addToOptimizer(
         ap->getPoseWithNoise().getPose(), g);
       ap->addToOptimizer(g);
@@ -366,11 +365,11 @@ static bool init_from_rel_pose_prior(Graph * g, const VertexDesc & v)
   }
   if (set_value_from_relative_pose_prior(
         g, v, rp->getPoseWithNoise().getPose())) {
-    ROS_DEBUG_STREAM("using rel pose prior: " << g->info(v));
+    LOG_DEBUG("using rel pose prior: " << g->info(v));
     rp->addToOptimizer(g);
     return (true);
   } else {
-    ROS_DEBUG_STREAM("cannot use rel pose prior: " << g->info(v));
+    LOG_DEBUG("cannot use rel pose prior: " << g->info(v));
   }
   return (false);
 }
@@ -384,7 +383,7 @@ static bool init_from_proj_factor(
   }
   // do homography for this vertex
   const CameraIntrinsics ci = fp->getCamera()->getIntrinsics();
-  ROS_DEBUG_STREAM("computing pose for factor " << g->info(v));
+  LOG_DEBUG("computing pose for factor " << g->info(v));
   auto rv = init_pose::pose_from_4(
     fp->getImageCorners(), fp->getTag()->getObjectCorners(), ci.getK(),
     ci.getDistortionModel(), ci.getD(), poseInitParams);
@@ -402,7 +401,7 @@ static bool init_from_proj_factor(
       return (false);  // not enough info to pin down pose!
     }
   } else {
-    //ROS_INFO_STREAM("could not find valid homography!");
+    // LOG_INFO("could not find valid homography!");
     return (false);
   }
   return (true);
@@ -416,7 +415,7 @@ find_vertexes_to_remove(const Graph & g)
     VertexVec values = g.getConnected(fac);
     for (const auto & v : values) {
       if (!g.isOptimized(v)) {
-        ROS_DEBUG_STREAM("found unopt factor: " << g.info(v));
+        LOG_DEBUG("found unopt factor: " << g.info(v));
         vertexesToRemove.second.insert(v);  // must remove this value
         if (g.getConnected(v).size() <= 1) {
           // only connected to the network by this factor, safe to remove!
@@ -484,35 +483,34 @@ static bool try_initialization(
   // populate the subgraph with factors from the full graph
   graph_utils::copy_subgraph(
     sg.get(), g, factors, absPriorPositionNoise, absPriorRotationNoise);
-  //subGraph.print("init subgraph");
+  // subGraph.print("init subgraph");
   if (initialize_subgraph(&subGraph, poseInitParams)) {
     profiler->reset("subgraphOpt");
     double err = subGraph.optimizeFull();
     profiler->record("subgraphOpt");
     double maxErr = subGraph.getMaxError();
-    ROS_DEBUG_STREAM(
-      "ordering " << ord << " has error: " << err << " " << maxErr);
+    LOG_DEBUG("ordering " << ord << " has error: " << err << " " << maxErr);
     if (maxErr >= 0 && maxErr < *errMin) {
       *errMin = maxErr;
       *bestGraph = sg;
-      ROS_DEBUG_STREAM("subgraph " << ord << " has minimum error: " << *errMin);
+      LOG_DEBUG("subgraph " << ord << " has minimum error: " << *errMin);
       if (maxErr < errLimit) {
-        //ROS_DEBUG_STREAM("breaking early due to low error");
+        // LOG_DEBUG("breaking early due to low error");
         return (true);
       } else {
-        ROS_DEBUG_STREAM("error map for subgraph: ");
+        LOG_DEBUG("error map for subgraph: ");
         // move this statement earlier if you want to debug the
         // graph *before* it is optimized
         const auto errMap = subGraph.getErrorMap();
         for (const auto & ev : errMap) {
-          ROS_INFO_STREAM(
+          LOG_INFO(
             "SUBGRAPH ERROR_MAP  " << ev.first << " "
                                    << *(subGraph.getVertex(ev.second)));
         }
       }
     }
   } else {
-    ROS_DEBUG_STREAM("subgraph rejected for ordering " << ord);
+    LOG_DEBUG("subgraph rejected for ordering " << ord);
   }
   return (false);
 }
@@ -523,15 +521,15 @@ double GraphUpdater::initializeSubgraphs(
 {
   double totalSGError(0);
 
-  ROS_DEBUG_STREAM("------ initializing " << verts.size() << " subgraphs");
+  LOG_DEBUG("------ initializing " << verts.size() << " subgraphs");
   subGraphs->clear();
   for (const auto & vs : verts) {  // iterate over all subgraphs
-    ROS_DEBUG_STREAM("---------- subgraph of size: " << vs.size());
+    LOG_DEBUG("---------- subgraph of size: " << vs.size());
     profiler_.reset("initializeSubgraphs");
     std::vector<VertexDeque> orderings;
     enumerate(&orderings, vs);
 
-    ROS_DEBUG_STREAM("number of factor orderings: " << orderings.size());
+    LOG_DEBUG("number of factor orderings: " << orderings.size());
     GraphPtr bestGraph;
     int ord(0);
     double errMin = 1e10;
@@ -549,7 +547,7 @@ double GraphUpdater::initializeSubgraphs(
     if (bestGraph) {  // found an acceptable error value
       profiler_.reset("initializeFromSubgraphs");
       subGraphs->push_back(bestGraph);
-      ROS_DEBUG_STREAM(
+      LOG_DEBUG(
         "best subgraph init found after "
         << ord << " attempts with error: " << errMin);
       const double sgErr = bestGraph->getError();
@@ -558,13 +556,12 @@ double GraphUpdater::initializeSubgraphs(
         totalSGError += sgErr;
         graph_utils::initialize_from(graph, *bestGraph);
       } else {
-        ROS_WARN_STREAM(
-          "dropping subgraph with error: " << sgErr << " " << maxErr);
+        LOG_WARN("dropping subgraph with error: " << sgErr << " " << maxErr);
       }
-      //bestGraph->printErrorMap("BEST SUBGRAPH");
+      // bestGraph->printErrorMap("BEST SUBGRAPH");
       profiler_.record("initializeFromSubgraphs");
     } else {
-      ROS_WARN_STREAM("could not initialize subgraph!");
+      LOG_WARN("could not initialize subgraph!");
     }
   }
   return (totalSGError);
@@ -585,33 +582,33 @@ double GraphUpdater::optimize(Graph * graph, double thresh)
         const int MAX_COUNT(1000000);
         for (auto it = errMap.rbegin();
              it != errMap.rend() && count < MAX_COUNT; ++it, count++) {
-          ROS_INFO_STREAM(
+          LOG_INFO(
             "ERROR_MAP_BEFORE  " << it->first << " "
                                  << *((*graph)[it->second]));
         }
-        //graph->printErrorMap("ERROR DETAILS BEFORE");
+        // graph->printErrorMap("ERROR DETAILS BEFORE");
       }
 #endif
       error = graph->optimize(thresh);
       numIncrementalOpt_++;
       // if there is a large increase in error, perform
       // a full optimization.
-      // TODO: this is a terrible hack. Why does the
+      // TODO(Bernd): this is a terrible hack. Why does the
       // incremental optimizer fail? No idea.
       const double deltaErr = error - lastIncError_;
       const double MIN_DELTA_ERR = 1.0;
       if (deltaErr > 5 * thresh && deltaErr > MIN_DELTA_ERR) {
-        ROS_INFO_STREAM(
+        LOG_INFO(
           "large err inc: " << deltaErr << " vs " << thresh
                             << ", doing full optimization");
         error = graph->optimizeFull(/*force*/ true);
-        ROS_INFO_STREAM("error after full opt: " << error);
+        LOG_INFO("error after full opt: " << error);
         graph->transferFullOptimization();
         numIncrementalOpt_ = 0;
       }
       lastIncError_ = error;
     } else {
-      ROS_INFO_STREAM("max count reached, running full optimization!");
+      LOG_INFO("max count reached, running full optimization!");
       error = graph->optimizeFull(/*force*/ true);
       graph->transferFullOptimization();
       numIncrementalOpt_ = 0;
@@ -634,11 +631,11 @@ bool GraphUpdater::applyFactorsToGraph(
   subgraphError_ += serr;
   const double err = optimize(graph, serr);
   if (err >= 0) {
-    ROS_INFO_STREAM(
+    LOG_INFO(
       "[" << t << "] subgraph err: " << serr << ", subgraph sum: "
           << subgraphError_ << ", full graph error: " << err);
   } else {
-    ROS_INFO_STREAM(
+    LOG_INFO(
       "[" << t << "] subgraph err: " << serr
           << ", subgraph sum: " << subgraphError_);
   }
@@ -651,7 +648,7 @@ void GraphUpdater::processNewFactors(
 {
   profiler_.reset("processNewFactors");
   if (facs.empty()) {
-    ROS_DEBUG_STREAM("no new factors received!");
+    LOG_DEBUG("no new factors received!");
     profiler_.record("processNewFactors");
     return;
   }
@@ -660,7 +657,7 @@ void GraphUpdater::processNewFactors(
   SubGraph covered;
   bool oldFactorsActivated = applyFactorsToGraph(graph, t, facs, &covered);
   if (!oldFactorsActivated) {
-    ROS_DEBUG_STREAM("no old factors activated!");
+    LOG_DEBUG("no old factors activated!");
     profiler_.record("processNewFactors");
     return;
   }
@@ -671,14 +668,14 @@ void GraphUpdater::processNewFactors(
     // work on the most recent factors
     const auto it = oldFactors_.rbegin();
     const auto oldTime = it->first;
-    ROS_DEBUG_STREAM(
+    LOG_DEBUG(
       "++++++++ handling " << it->second.size()
                            << " old factors for t = " << oldTime);
     if (!applyFactorsToGraph(graph, oldTime, it->second, &covered)) {
       break;
     }
   }
-  ROS_INFO_STREAM("graph after update: " << graph->getStats());
+  LOG_INFO("graph after update: " << graph->getStats());
   profiler_.record("processNewFactors");
 }
 
@@ -689,7 +686,7 @@ void GraphUpdater::eraseStoredFactors(
   const TimeToVertexesMap::iterator it = oldFactors_.find(t);
   if (it != oldFactors_.end()) {
     VertexVec & factors = it->second;
-    // TODO: erasing individual elements from a vector
+    // TODO(Bernd): erasing individual elements from a vector
     // is inefficient. Use different structure
     for (auto ii = factors.begin(); ii != factors.end();) {
       if (contains(covered, *ii)) {
@@ -707,35 +704,36 @@ void GraphUpdater::eraseStoredFactors(
 
 void GraphUpdater::printPerformance()
 {
-  ROS_INFO_STREAM("updater performance:");
+  LOG_INFO("updater performance:");
   std::cout << profiler_ << std::endl;
 }
 
-void GraphUpdater::parse(XmlRpc::XmlRpcValue config)
+void GraphUpdater::parse(const YAML::Node & config)
 {
-  if (!config.hasMember("tagslam_parameters")) {
+  if (!config["tagslam_parameters"]) {
     BOMB_OUT("tagslam config file must have tagslam_parameters!");
   }
-  XmlRpc::XmlRpcValue cfg = config["tagslam_parameters"];
+  const auto cfg = config["tagslam_parameters"];
   try {
-    pixelNoise_ = xml::parse<double>(cfg, "pixel_noise", 1.0);
+    pixelNoise_ = yaml::parse<double>(cfg, "pixel_noise", 1.0);
     poseInitParams_.minViewingAngle =
-      xml::parse<double>(cfg, "minimum_viewing_angle", 20.0);
+      yaml::parse<double>(cfg, "minimum_viewing_angle", 20.0);
     poseInitParams_.ambiguityAngleThreshold =
-      xml::parse<double>(cfg, "ambiguity_angle_threshold", 60.0) / 180.0 * M_PI;
+      yaml::parse<double>(cfg, "ambiguity_angle_threshold", 60.0) / 180.0 *
+      M_PI;
     poseInitParams_.maxAmbiguityRatio =
-      xml::parse<double>(cfg, "max_ambiguity_ratio", 0.3);
-    maxSubgraphError_ = xml::parse<double>(cfg, "max_subgraph_error", 50.0);
+      yaml::parse<double>(cfg, "max_ambiguity_ratio", 0.3);
+    maxSubgraphError_ = yaml::parse<double>(cfg, "max_subgraph_error", 50.0);
     subGraphAbsPriorPositionNoise_ =
-      xml::parse<double>(cfg, "subgraph_abs_prior_position_noise", 0.001);
+      yaml::parse<double>(cfg, "subgraph_abs_prior_position_noise", 0.001);
     subGraphAbsPriorRotationNoise_ =
-      xml::parse<double>(cfg, "subgraph_abs_prior_rotation_noise", 0.001);
+      yaml::parse<double>(cfg, "subgraph_abs_prior_rotation_noise", 0.001);
     maxNumIncrementalOpt_ =
-      xml::parse<int>(cfg, "max_num_incremental_opt", 100);
-    optimizerMode_ = xml::parse<string>(cfg, "optimizer_mode", "slow");
+      yaml::parse<int>(cfg, "max_num_incremental_opt", 100);
+    optimizerMode_ = yaml::parse<string>(cfg, "optimizer_mode", "slow");
     setOptimizerMode(optimizerMode_);
-  } catch (const XmlRpc::XmlRpcException & e) {
-    BOMB_OUT("error parsing tagslam_parameters!");
+  } catch (const std::runtime_error & e) {
+    BOMB_OUT("error parsing tagslam_parameters: " << e.what());
   }
 }
 

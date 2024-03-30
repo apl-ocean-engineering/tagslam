@@ -32,7 +32,6 @@ int main(int argc, char ** argv)
     Eigen::Translation3d(Eigen::Vector3d::UnitZ() * 6.0) *
     Eigen::AngleAxisd(3.14159265 / 180.0 * 45.0, Eigen::Vector3d::UnitY());
 
-  //std::cout << T.matrix() << std::endl;
   double beta_orig, beta_min, beta_max;
   const double tau =
     tagslam::rpp::check_quality(ip, wp, T, &beta_orig, &beta_min, &beta_max);

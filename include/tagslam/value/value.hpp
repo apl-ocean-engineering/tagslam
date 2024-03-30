@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TAGSLAM__TAGSLAM__VALUE_HPP_
-#define TAGSLAM__TAGSLAM__VALUE_HPP_
+#ifndef TAGSLAM__VALUE__VALUE_HPP_
+#define TAGSLAM__VALUE__VALUE_HPP_
 
 #include <tagslam/value_key.hpp>
 #include <tagslam/vertex.hpp>
@@ -26,14 +26,17 @@ namespace value
 class Value : public Vertex
 {
 public:
-  Value(const std::string & s = "", uint64_t t = 0) : Vertex(s, "ellipse", t) {}
+  explicit Value(const std::string & s = "", uint64_t t = 0)
+  : Vertex(s, "ellipse", t)
+  {
+  }
   virtual ~Value() {}
   bool isValue() const override { return (true); }
-  virtual std::string getLabel() const override { return (Vertex::getLabel()); }
+  std::string getLabel() const override { return (Vertex::getLabel()); }
 };
 }  // namespace value
 typedef std::shared_ptr<value::Value> ValuePtr;
 typedef std::shared_ptr<const value::Value> ValueConstPtr;
 
 }  // namespace tagslam
-#endif  // TAGSLAM__VALUE_HPP_
+#endif  // TAGSLAM__VALUE__VALUE_HPP_

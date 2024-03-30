@@ -1,6 +1,8 @@
 // -*-c++-*---------------------------------------------------------------------------------------
-// Copyright 2024 Bernd Pfrommer <bernd.pfrommer@gmail.com>
+//
 // Based on gtsam code by Frank Dellaert, et.al, Georgia Tech Research Corporation.
+//
+// Copyright 2024 Bernd Pfrommer <bernd.pfrommer@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -116,9 +118,9 @@ static gtsam::Matrix2 D2dintrinsic(
 
   DR <<  //            dx                      dy
     fR + 2 * dfdR * x2 + 2 * p1y + 6 * p2x,
-    2 * xy * dfdR + 2 * p1x + 2 * p2y,  //du
+    2 * xy * dfdR + 2 * p1x + 2 * p2y,  // du
     2 * xy * dfdR + 2 * p1x + 2 * p2y,
-    fR + 2 * dfdR * y2 + 6 * p1y + 2 * p2x;  //dv
+    fR + 2 * dfdR * y2 + 6 * p1y + 2 * p2x;  // dv
 
   return DK * DR;
 }
@@ -130,7 +132,7 @@ struct GeometricParams
     double k4, double k5, double k6)
   : x(xa), y(ya)
   {
-#if 0    
+#if 0
     std::cout << "k:  "
               << k1 << " " << k2 << " " << k3 << " "
               << k4 << " " << k5 << " " << k6 << std::endl;

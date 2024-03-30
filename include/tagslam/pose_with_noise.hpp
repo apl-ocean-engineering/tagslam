@@ -13,7 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef TAGSLAM__POSE_WITH_NOISE_HPP_
+#define TAGSLAM__POSE_WITH_NOISE_HPP_
 
 #include <tagslam/geometry.hpp>
 #include <tagslam/pose_noise.hpp>
@@ -25,10 +26,12 @@ class PoseWithNoise
 public:
   using string = std::string;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  PoseWithNoise(
+  explicit PoseWithNoise(
     const Transform & tf = Transform::Identity(),
     const PoseNoise & n = PoseNoise(), bool isVal = false)
-  : pose_(tf), noise_(n), valid_(isVal){};
+  : pose_(tf), noise_(n), valid_(isVal)
+  {
+  }
   const Transform & getPose() const { return (pose_); }
   const PoseNoise & getNoise() const { return (noise_); }
   bool isValid() const { return (valid_); }
@@ -42,3 +45,5 @@ private:
 };
 std::ostream & operator<<(std::ostream & os, const PoseWithNoise & pe);
 }  // namespace tagslam
+
+#endif  // TAGSLAM__POSE_WITH_NOISE_HPP_

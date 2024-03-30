@@ -33,11 +33,12 @@ class Vertex
 public:
   typedef std::shared_ptr<Vertex> VertexPtr;
   typedef std::shared_ptr<const Vertex> VertexConstPtr;
-  Vertex(const std::string & n = "", const std::string & s = "", uint64_t t = 0)
+  explicit Vertex(
+    const std::string & n = "", const std::string & s = "", uint64_t t = 0)
   : name_(n), shape_(s), time_(t)
   {
   }
-  virtual ~Vertex(){};
+  virtual ~Vertex() {}
   virtual bool isValue() const = 0;
   virtual std::shared_ptr<Vertex> clone() const = 0;
   virtual VertexId getId() const = 0;

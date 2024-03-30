@@ -13,28 +13,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <XmlRpcException.h>
-#include <geometry_msgs/Point.h>
-
-#include <boost/range/irange.hpp>
+#include <geometry_msgs/msg/point.hpp>
 #include <sstream>
 #include <string>
 #include <tagslam/body.hpp>
 #include <tagslam/factor/distance.hpp>
 #include <tagslam/graph.hpp>
 #include <tagslam/logging.hpp>
-#include <tagslam/xml.hpp>
+#include <tagslam/yaml.hpp>
 
 namespace tagslam
 {
 namespace factor
 {
-using boost::irange;
+static rclcpp::Logger get_logger()
+{
+  return (rclcpp::get_logger("distance_factor"));
+}
 
 Distance::Distance(
   double dist, double noise, const int corn1, const TagConstPtr & tag1,
   const int corn2, const TagConstPtr & tag2, const string & name)
-: Factor(name, ros::Time(0)), distance_(dist), noise_(noise)
+: Factor(name, 0ULL), distance_(dist), noise_(noise)
 {
   tag_[0] = tag1;
   tag_[1] = tag2;
@@ -44,7 +44,7 @@ Distance::Distance(
 
 VertexDesc Distance::addToGraph(const VertexPtr & vp, Graph * g) const
 {
-  const ros::Time t0 = ros::Time(0);
+  const uint64_t t0{0ULL};
   const VertexDesc vt1p = g->findTagPose(getTag(0)->getId());
   checkIfValid(vt1p, "tag pose 1 not found");
   const VertexDesc vt2p = g->findTagPose(getTag(1)->getId());
@@ -88,20 +88,20 @@ double Distance::distance(
 }
 
 DistanceFactorPtr Distance::parse(
-  const string & name, XmlRpc::XmlRpcValue meas, TagFactory * tagFactory)
+  const string & name, const YAML::Node & meas, TagFactory * tagFactory)
 {
   try {
-    const int tag1 = xml::parse<int>(meas, "tag1");
-    const int tag2 = xml::parse<int>(meas, "tag2");
-    const int c1 = xml::parse<int>(meas, "corner1");
-    const int c2 = xml::parse<int>(meas, "corner2");
-    const double d = xml::parse<double>(meas, "distance");
-    const double noise = xml::parse<double>(meas, "noise");
+    const int tag1 = yaml::parse<int>(meas, "tag1");
+    const int tag2 = yaml::parse<int>(meas, "tag2");
+    const int c1 = yaml::parse<int>(meas, "corner1");
+    const int c2 = yaml::parse<int>(meas, "corner2");
+    const double d = yaml::parse<double>(meas, "distance");
+    const double noise = yaml::parse<double>(meas, "noise");
 
     TagConstPtr tag1Ptr = tagFactory->findTag(tag1);
     TagConstPtr tag2Ptr = tagFactory->findTag(tag2);
     if (!tag1Ptr || !tag2Ptr) {
-      ROS_WARN_STREAM(
+      LOG_WARN(
         "ignoring distance factor with invalid "
         " tags: "
         << name);
@@ -110,35 +110,33 @@ DistanceFactorPtr Distance::parse(
     const DistanceFactorPtr fp(
       new factor::Distance(d, noise, c1, tag1Ptr, c2, tag2Ptr, name));
     return (fp);
-  } catch (const XmlRpc::XmlRpcException & e) {
-    BOMB_OUT("error parsing measurement:" + name);
+  } catch (const std::runtime_error & e) {
+    BOMB_OUT("error parsing measurement: " + name);
   }
 }
 
 DistanceFactorPtrVec Distance::parse(
-  XmlRpc::XmlRpcValue meas, TagFactory * tagFactory)
+  const YAML::Node & meas, TagFactory * tagFactory)
 {
   DistanceFactorPtrVec dv;
-  if (meas.getType() == XmlRpc::XmlRpcValue::TypeInvalid) {
+  if (meas.IsNull()) {
     throw std::runtime_error("invalid node type for measurement!");
   }
-  for (const auto i : irange(0, meas.size())) {
-    if (meas[i].getType() != XmlRpc::XmlRpcValue::TypeStruct) continue;
-    for (XmlRpc::XmlRpcValue::iterator it = meas[i].begin();
-         it != meas[i].end(); ++it) {
-      if (it->second.getType() != XmlRpc::XmlRpcValue::TypeStruct) {
-        continue;
-      }
-      DistanceFactorPtr d = parse(it->first, it->second, tagFactory);
-      if (d) {
-        dv.push_back(d);
+  for (size_t i = 0; i < meas.size(); i++) {
+    if (!meas[i].IsMap()) continue;
+    for (const auto & m : meas[i]) {
+      if (m.IsMap()) {
+        DistanceFactorPtr d = parse(m.Tag(), m, tagFactory);
+        if (d) {
+          dv.push_back(d);
+        }
       }
     }
   }
   return (dv);
 }
 
-string Distance::getLabel() const
+std::string Distance::getLabel() const
 {
   std::stringstream ss;
   ss << name_;

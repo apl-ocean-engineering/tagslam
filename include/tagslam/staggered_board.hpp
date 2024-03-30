@@ -28,7 +28,8 @@ public:
   typedef std::shared_ptr<StaggeredBoard> StaggeredBoardPtr;
   typedef std::shared_ptr<const StaggeredBoard> StaggeredBoardConstPtr;
 
-  StaggeredBoard(const string & n = string(""), bool iS = false) : Body(n, iS)
+  explicit StaggeredBoard(const string & n = string(""), bool iS = false)
+  : Body(n, iS)
   {
     type_ = "staggered_board";
   }

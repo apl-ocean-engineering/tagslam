@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <boost/range/irange.hpp>
 #include <iostream>
 #include <tagslam/logging.hpp>
 #include <tagslam/quartic.hpp>
@@ -63,13 +62,13 @@ namespace tagslam
 {
 namespace rpp
 {
-using boost::irange;
+static rclcpp::Logger get_logger() { return (rclcpp::get_logger("rpp")); }
 
 static double eval_poly(double x, const double * a, int n)
 {
   double p = 1.0;
   double sum = 0;
-  for (const auto i : irange(0, n)) {
+  for (int i = 0; i < n; i++) {
     sum += p * a[i];
     p = p * x;
   }
@@ -90,7 +89,7 @@ static Transform rotate_to_z(const Eigen::Vector3d & translat, double * ang)
   }
   const double sin_a = sin_a_t_norm / t_norm;
   const Eigen::Vector3d n = txz / sin_a_t_norm;
-  //const Transform tf = Eigen::AngleAxisd(std::asin(sin_a), n);
+  // const Transform tf = Eigen::AngleAxisd(std::asin(sin_a), n);
   *ang = std::asin(sin_a);
   const Transform tf = (Transform)Eigen::AngleAxisd(*ang, n);
   return (tf);
@@ -157,13 +156,13 @@ static Eigen::Matrix3d compute_FTF(
   const auto G = compute_G(V_tilde);
   Eigen::Matrix3d C_sum = Eigen::Matrix3d::Zero();
   M33dVec C(n);
-  for (const auto i : irange(0ul, V_tilde.size())) {
+  for (size_t i = 0; i < V_tilde.size(); i++) {
     const auto ImV_i = Eigen::Matrix3d::Identity() - V_tilde[i];
     C[i] = ImV_i * R_z * make_K(p_tilde.row(i));
     C_sum = C_sum + ImV_i.transpose() * C[i];
   }
   Eigen::Matrix3d FTF = Eigen::Matrix3d::Zero();
-  for (const auto i : irange(0ul, V_tilde.size())) {
+  for (size_t i = 0; i < V_tilde.size(); i++) {
     const auto ImV_i = Eigen::Matrix3d::Identity() - V_tilde[i];
     const auto F_i = C[i] - ImV_i * G * C_sum;
     FTF = FTF + F_i.transpose() * F_i;
@@ -232,7 +231,7 @@ static int find_minima(
   *E_min = 1e90;
   *E_max = -1e90;
   // check all real roots, and evaluate second deriv there
-  for (const auto i : irange(0, nroots)) {
+  for (int i = 0; i < nroots; i++) {
     if (std::imag(root[i]) < 1e-8) {
       const double beta_t = std::real(root[i]);
       if (eval_poly(beta_t, h, 6) > 0) {
@@ -295,7 +294,7 @@ double check_quality(
       return (0.0);  // single minimum, assume all is good
       break;
     default:
-      ROS_WARN_STREAM("found bad num minima: " << n_min);
+      LOG_WARN("found bad num minima: " << n_min);
       *beta_min = beta;
       *beta_max = beta;
       return (0.0);  // close eyes and hope for the best....

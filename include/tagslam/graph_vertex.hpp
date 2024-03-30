@@ -13,9 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-
-//#include <tagslam/vertex.hpp>
+#ifndef TAGSLAM__GRAPH_VERTEX_HPP_
+#define TAGSLAM__GRAPH_VERTEX_HPP_
 
 #include <iostream>
 #include <memory>
@@ -28,3 +27,4 @@ typedef std::shared_ptr<Vertex> GraphVertex;
 std::ostream & operator<<(std::ostream & os, const GraphVertex & v);
 
 }  // namespace tagslam
+#endif  // TAGSLAM__GRAPH_VERTEX_HPP_

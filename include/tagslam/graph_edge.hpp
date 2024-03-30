@@ -22,7 +22,7 @@ namespace tagslam
 {
 struct GraphEdge
 {
-  GraphEdge(int i = 0) : edge_property(i){};
+  explicit GraphEdge(int i = 0) : edge_property(i) {}
   int edge_property;
   friend std::ostream & operator<<(std::ostream & os, const GraphEdge & e);
 };

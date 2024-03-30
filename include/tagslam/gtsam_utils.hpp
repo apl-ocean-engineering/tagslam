@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TAGSLAM__POSE_GTSAM_UTILS_HPP_
-#define TAGSLAM__POSE_GTSAM_UTILS_HPP_
+#ifndef TAGSLAM__GTSAM_UTILS_HPP_
+#define TAGSLAM__GTSAM_UTILS_HPP_
 
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/linear/NoiseModel.h>
@@ -37,4 +37,4 @@ inline Transform from_gtsam(const gtsam::Pose3 & p)
 gtsam::noiseModel::Gaussian::shared_ptr to_gtsam(const PoseNoise & pn);
 }  // namespace gtsam_utils
 }  // namespace tagslam
-#endif  // TAGSLAM__POSE_GTSAM_UTILS_HPP_
+#endif  // TAGSLAM__GTSAM_UTILS_HPP_

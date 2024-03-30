@@ -14,7 +14,7 @@
 // limitations under the License.
 
 #ifndef TAGSLAM__GRAPH_UTILS_HPP_
-#define TAGSLAM__GRAPH_UTILS_HPP__
+#define TAGSLAM__GRAPH_UTILS_HPP_
 
 #include <string>
 #include <tagslam/body.hpp>
@@ -72,4 +72,4 @@ void plot_debug(uint64_t t, const string & tag, const Graph & g);
 }  // namespace graph_utils
 }  // namespace tagslam
 
-#endif  // TAGSLAM__GRAPH_UTILS_HPP__
+#endif  // TAGSLAM__GRAPH_UTILS_HPP_

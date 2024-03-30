@@ -37,7 +37,7 @@ PoseNoise PoseNoise::make(double a, double p)
 static const PoseNoise::Matrix6d sqrt_info_to_sigma(
   const PoseNoise::Matrix6d & R)
 {
-  // TODO: test this! Is it working at all???
+  // TODO(Bernd): test this! Is it working at all???
   const PoseNoise::Matrix6d rsqi = (R.transpose() * R).inverse();
   return (rsqi);
 }
@@ -61,7 +61,7 @@ const PoseNoise::Matrix6d PoseNoise::getCovarianceMatrix() const
 
 PoseNoise::Matrix6d PoseNoise::convertToR() const
 {
-  //Sigma = R * R^T
+  // Sigma = R * R^T
   // Cholesky decomposition: sigma = L * L.transpose();
   const Matrix6d ni = noise_.inverse();
   Eigen::LLT<Matrix6d> llt(ni);

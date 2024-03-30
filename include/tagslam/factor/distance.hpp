@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TAGSLAM__DISTANCE_HPP_
-#define TAGSLAM__DISTANCE_HPP_
+#ifndef TAGSLAM__FACTOR__DISTANCE_HPP_
+#define TAGSLAM__FACTOR__DISTANCE_HPP_
 
 #include <string>
 #include <tagslam/factor/factor.hpp>
@@ -90,4 +90,4 @@ typedef factor::Distance::DistanceFactorConstPtr DistanceFactorConstPtr;
 typedef factor::Distance::DistanceFactorPtrVec DistanceFactorPtrVec;
 }  // namespace tagslam
 
-#endif  // TAGSLAM__DISTANCE_HPP_
+#endif  // TAGSLAM__FACTOR__DISTANCE_HPP_

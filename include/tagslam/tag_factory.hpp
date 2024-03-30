@@ -13,7 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef TAGSLAM__TAG_FACTORY_HPP_
+#define TAGSLAM__TAG_FACTORY_HPP_
 
 #include <tagslam/tag.hpp>
 
@@ -22,7 +23,9 @@ namespace tagslam
 class TagFactory
 {
 public:
-  virtual ~TagFactory(){};
+  virtual ~TagFactory() {}
   virtual TagConstPtr findTag(int tagId) = 0;
 };
 }  // namespace tagslam
+
+#endif  // TAGSLAM__TAG_FACTORY_HPP_

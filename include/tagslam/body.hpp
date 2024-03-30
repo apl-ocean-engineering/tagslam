@@ -119,9 +119,11 @@ public:
   static BodyVec parse_bodies(const YAML::Node & config);
 
 protected:
-  Body(const string & n = string(""), bool iS = false)
-  : name_(n), frameId_(n), isStatic_(iS){};
-  virtual ~Body(){};
+  explicit Body(const string & n = string(""), bool iS = false)
+  : name_(n), frameId_(n), isStatic_(iS)
+  {
+  }
+  virtual ~Body() {}
   bool parseCommon(const YAML::Node & config);
   bool writeCommon(std::ostream & os, const string & prefix) const;
   // -------------------------
@@ -161,4 +163,4 @@ using BodyConstPtr = Body::BodyConstPtr;
 using BodyVec = Body::BodyVec;
 using BodyConstVec = Body::BodyConstVec;
 }  // namespace tagslam
-#endif  // #define TAGSLAM__BODY_HPP_
+#endif  // TAGSLAM__BODY_HPP_

@@ -13,12 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef TAGSLAM__MEASUREMENTS__COORDINATE_HPP_
+#define TAGSLAM__MEASUREMENTS__COORDINATE_HPP_
 
 #include <tagslam/factor/coordinate.hpp>
 #include <tagslam/measurements/measurements.hpp>
-#include <tagslam/vertex.hpp>
-#include <vector>
+
+namespace YAML
+{
+class Node;  // forward decl
+}
 
 namespace tagslam
 {
@@ -33,9 +37,10 @@ public:
 
   // static functions
   static CoordinateMeasurementsPtr read(
-    XmlRpc::XmlRpcValue config, TagFactory * fac);
+    const YAML::Node & config, TagFactory * fac);
 
 private:
 };
 }  // namespace measurements
 }  // namespace tagslam
+#endif  // TAGSLAM__MEASUREMENTS__COORDINATE_HPP_

@@ -31,7 +31,7 @@ using std::string;
 class LabelWriter
 {
 public:
-  LabelWriter(const Graph * g) : graph_(g) {}
+  explicit LabelWriter(const Graph * g) : graph_(g) {}
   template <class VertexOrEdge>
   void operator()(std::ostream & out, const VertexOrEdge & v) const
   {
@@ -233,7 +233,7 @@ void initialize_from(Graph * destg, const Graph & srcg)
       std::dynamic_pointer_cast<factor::Factor>(srcg[sv]);
     if (
       sfp && !std::dynamic_pointer_cast<factor::AbsolutePosePrior>(srcg[sv])) {
-      //ROS_DEBUG_STREAM("transferring factor: " << srcg.info(sv));
+      // LOG_DEBUG("transferring factor: " << srcg.info(sv));
       VertexDesc dv = destg->find(sfp->getId());
       if (Graph::is_valid(dv)) {
         sfp->addToOptimizer(destg);

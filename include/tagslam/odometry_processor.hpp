@@ -48,7 +48,7 @@ private:
   BodyConstPtr body_;
   Transform pose_;
   uint64_t time_{0};
-  rclcpp::Publisher<Odometry> pub_;
+  std::shared_ptr<rclcpp::Publisher<Odometry>> pub_;
   Transform T_body_odom_;
   double accelerationNoiseMin_{5.0};          // m/s^2
   double angularAccelerationNoiseMin_{5.0};   // rad/sec^2

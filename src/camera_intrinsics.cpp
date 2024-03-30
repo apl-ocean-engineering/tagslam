@@ -18,7 +18,7 @@
 #include <string>
 #include <tagslam/camera_intrinsics.hpp>
 #include <tagslam/logging.hpp>
-#include <tagslam/xml.hpp>
+#include <tagslam/yaml.hpp>
 #include <tagslam/yaml_utils.hpp>
 #include <vector>
 
@@ -26,6 +26,10 @@ using std::string;
 
 namespace tagslam
 {
+static rclcpp::Logger get_logger()
+{
+  return (rclcpp::get_logger("camera_intrinsics"));
+}
 
 static std::map<string, DistortionModel> distMap = {
   {"rad_tan", RADTAN},   {"radtan", RADTAN},
@@ -42,19 +46,20 @@ static std::string model_to_string(DistortionModel m)
   return ("INVALID");
 }
 
-CameraIntrinsics CameraIntrinsics::parse_no_error(XmlRpc::XmlRpcValue config)
+CameraIntrinsics CameraIntrinsics::parse_no_error(const YAML::Node & config)
 {
   CameraIntrinsics ci;
-  ci.cameraModel_ = xml::parse<string>(config, "camera_model");
-  const string distModel = xml::parse<string>(config, "distortion_model");
+  ci.cameraModel_ = yaml::parse<string>(config, "camera_model");
+  const string distModel = yaml::parse<string>(config, "distortion_model");
   if (distMap.count(distModel) == 0) {
     BOMB_OUT("unknown distortion model: " << distModel);
   }
   ci.distortionModel_ = distMap[distModel];
   ci.distortionCoeffs_ =
-    xml::parse_container<std::vector<double>>(config, "distortion_coeffs");
-  ci.K_ = xml::parse_container<std::vector<double>>(config, "intrinsics");
-  ci.resolution_ = xml::parse_container<std::vector<int>>(config, "resolution");
+    yaml::parse_container<std::vector<double>>(config, "distortion_coeffs");
+  ci.K_ = yaml::parse_container<std::vector<double>>(config, "intrinsics");
+  ci.resolution_ =
+    yaml::parse_container<std::vector<int>>(config, "resolution");
   // precompute K and D
   ci.cvK_ =
     (cv::Mat_<double>(3, 3) << ci.K_[0], 0.0, ci.K_[2], 0.0, ci.K_[1], ci.K_[3],
@@ -67,13 +72,12 @@ CameraIntrinsics CameraIntrinsics::parse_no_error(XmlRpc::XmlRpcValue config)
   return (ci);
 }
 
-CameraIntrinsics CameraIntrinsics::parse(XmlRpc::XmlRpcValue config)
+CameraIntrinsics CameraIntrinsics::parse(const YAML::Node & config)
 {
   try {
     return (parse_no_error(config));
-  } catch (const XmlRpc::XmlRpcException & e) {
-    ROS_ERROR_STREAM("error parsing camera intrinsics: " << e.getMessage());
-    throw e;
+  } catch (const std::runtime_error & e) {
+    BOMB_OUT("error parsing camera intrinsics: " << e.what());
   }
 }
 

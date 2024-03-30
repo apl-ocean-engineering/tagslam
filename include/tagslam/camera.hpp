@@ -69,4 +69,4 @@ using CameraPtr = Camera::CameraPtr;
 using CameraConstPtr = Camera::CameraConstPtr;
 using CameraVec = Camera::CameraVec;
 }  // namespace tagslam
-#endif  // TAGSLAM__CAMERA_INTRINSICS_HPP_
+#endif  // TAGSLAM__CAMERA_HPP_
