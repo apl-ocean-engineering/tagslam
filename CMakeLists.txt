@@ -48,6 +48,7 @@ set(ament_dependencies
   "rclcpp"
   "rclcpp_components"
   "rosbag2_cpp"
+  "rosbag2_transport"
   "sensor_msgs"
   "tf2_ros"
   "tf2_msgs"
@@ -59,13 +60,9 @@ foreach(pkg ${ament_dependencies})
   find_package(${pkg} REQUIRED)
 endforeach()
 
-# find_package(OpenMP)
-# IF(OPENMP_FOUND)
-# SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-# SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-# SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_C_FLAGS}")
-# ENDIF()
-
+if(${cv_bridge_VERSION} GREATER "3.3.0")
+  add_definitions(-DUSE_CV_BRIDGE_HPP)
+endif()
 
 #
 # --------- library
@@ -133,12 +130,34 @@ target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME}_node PRIVATE include)
 target_compile_features(${PROJECT_NAME}_node PRIVATE cxx_std_17)
 
+#
+# -------- processing from bag
+#
+add_executable(${PROJECT_NAME}_from_bag src/${PROJECT_NAME}_from_bag.cpp)
+ament_target_dependencies(${PROJECT_NAME}_from_bag ${ament_dependencies})
+target_link_libraries(${PROJECT_NAME}_from_bag ${PROJECT_NAME})
+target_include_directories(${PROJECT_NAME}_from_bag PRIVATE include)
+target_compile_features(${PROJECT_NAME}_from_bag PRIVATE cxx_std_17)
+
+#
+# -------- sync-and-detect
+#
+add_executable(sync_and_detect_node src/sync_and_detect_node.cpp)
+ament_target_dependencies(sync_and_detect_node flex_sync rclcpp sensor_msgs nav_msgs image_transport)
+target_include_directories(sync_and_detect_node PRIVATE include)
+target_compile_features(sync_and_detect_node PRIVATE cxx_std_17)
+
+
+#
+# --------------------- installation -----------------------------
+#
 # the node must go into the project specific lib directory or else
 # the launch file will not find it
 
 install(TARGETS
   ${PROJECT_NAME}_node
-
+  ${PROJECT_NAME}_from_bag
+  sync_and_detect_node
   DESTINATION lib/${PROJECT_NAME}/)
 
 # the shared library goes into the global lib dir so it can

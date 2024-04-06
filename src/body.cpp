@@ -142,17 +142,12 @@ BodyVec Body::parse_bodies(const YAML::Node & config)
   }
   const auto bodies = config["bodies"];
   for (const auto & body : bodies) {
-    if (!body.IsMap()) continue;
-    std::cout << "body: " << body << std::endl;
-    /*
-XXX fix me! 
-    for (const auto bi : body) {
-      if (bi.IsScalar()) {
-        BodyPtr rb = parse_body(bi, it->second);
+    if (body.IsMap()) {
+      for (const auto & bm : body) {
+        BodyPtr rb = parse_body(bm.first.as<std::string>(), bm.second);
         bv.push_back(rb);
       }
     }
-*/
   }
   return (bv);
 }

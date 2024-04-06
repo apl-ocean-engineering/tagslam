@@ -144,6 +144,7 @@ TagSLAM::TagSLAM(const rclcpp::NodeOptions & options) : Node("tagslam", options)
   // graph
   graph_ = initialGraph_;
   graph_->setVerbosity("SILENT");
+  initialize();
 }
 
 TagConstPtr TagSLAM::findTag(int tagId)
@@ -401,7 +402,6 @@ void TagSLAM::readBodies(const YAML::Node & config)
   // read body defaults first in case
   // bodies do not provide all parameters
   BodyDefaults::parse(config);  // keeps global state!
-
   // now read bodies
   bodies_ = Body::parse_bodies(config);
   for (const auto & body : bodies_) {

@@ -29,7 +29,7 @@ std::shared_ptr<BodyDefaults> s_ptr;
 std::shared_ptr<BodyDefaults> BodyDefaults::instance() { return (s_ptr); }
 void BodyDefaults::parse(const YAML::Node & config)
 {
-  if (config["body_defaults"]) {
+  if (!config["body_defaults"]) {
     BOMB_OUT("no body defaults found!");
   }
   try {
