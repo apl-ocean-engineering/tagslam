@@ -38,12 +38,12 @@ find_package(yaml-cpp REQUIRED)
 find_package(Boost REQUIRED COMPONENTS graph)
 find_package(GTSAM REQUIRED)
 
-set(ament_dependencies
+set(tagslam_ament_dependencies
   "apriltag_msgs"
   "cv_bridge"
-  "flex_sync"
   "geometry_msgs"
   "image_transport"
+  "flex_sync"
   "nav_msgs"
   "rclcpp"
   "rclcpp_components"
@@ -56,7 +56,22 @@ set(ament_dependencies
   "rosgraph_msgs"
   "std_srvs")
 
-foreach(pkg ${ament_dependencies})
+set(sync_and_detect_ament_dependencies
+  "apriltag_msgs"
+  "apriltag_detector"
+  "flex_sync"
+  "image_transport"
+  "pluginlib"
+  "nav_msgs"
+  "rclcpp"
+  "sensor_msgs"
+  )
+
+set(all_ament_dependencies
+  ${tagslam_ament_dependencies}
+  ${sync_and_detect_ament_dependencies})
+
+foreach(pkg ${all_ament_dependencies})
   find_package(${pkg} REQUIRED)
 endforeach()
 
@@ -109,7 +124,7 @@ add_library(${PROJECT_NAME} SHARED
   src/yaml.cpp
 )
 
-ament_target_dependencies(${PROJECT_NAME} ${ament_dependencies})
+ament_target_dependencies(${PROJECT_NAME} ${tagslam_ament_dependencies})
 target_link_libraries(${PROJECT_NAME} opencv_core opencv_imgproc opencv_calib3d yaml-cpp gtsam)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
@@ -125,7 +140,7 @@ rclcpp_components_register_nodes(${PROJECT_NAME} "${PROJECT_NAME}::TagSLAM")
 # -------- node
 #
 add_executable(${PROJECT_NAME}_node src/tagslam_node.cpp)
-ament_target_dependencies(${PROJECT_NAME}_node ${ament_dependencies})
+# ament_target_dependencies(${PROJECT_NAME}_node ${tagslam_ament_dependencies})
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME}_node PRIVATE include)
 target_compile_features(${PROJECT_NAME}_node PRIVATE cxx_std_17)
@@ -134,7 +149,7 @@ target_compile_features(${PROJECT_NAME}_node PRIVATE cxx_std_17)
 # -------- processing from bag
 #
 add_executable(${PROJECT_NAME}_from_bag src/${PROJECT_NAME}_from_bag.cpp)
-ament_target_dependencies(${PROJECT_NAME}_from_bag ${ament_dependencies})
+ament_target_dependencies(${PROJECT_NAME}_from_bag ${tagslam_ament_dependencies})
 target_link_libraries(${PROJECT_NAME}_from_bag ${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME}_from_bag PRIVATE include)
 target_compile_features(${PROJECT_NAME}_from_bag PRIVATE cxx_std_17)
@@ -143,10 +158,12 @@ target_compile_features(${PROJECT_NAME}_from_bag PRIVATE cxx_std_17)
 # -------- sync-and-detect
 #
 add_executable(sync_and_detect_node src/sync_and_detect_node.cpp)
-ament_target_dependencies(sync_and_detect_node flex_sync rclcpp sensor_msgs nav_msgs image_transport)
+ament_target_dependencies(sync_and_detect_node
+  ${sync_and_detect_ament_dependencies} cv_bridge)
+target_link_libraries(sync_and_detect_node yaml-cpp)
+
 target_include_directories(sync_and_detect_node PRIVATE include)
 target_compile_features(sync_and_detect_node PRIVATE cxx_std_17)
-
 
 #
 # --------------------- installation -----------------------------
