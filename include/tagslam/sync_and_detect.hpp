@@ -16,196 +16,145 @@
 #ifndef TAGSLAM__SYNC_AND_DETECT_HPP_
 #define TAGSLAM__SYNC_AND_DETECT_HPP_
 
-#include <flex_sync/approximate_sync.h>
-#include <flex_sync/exact_sync.h>
-#include <image_transport/image_transport.h>
-#include <nav_msgs/Odometry.h>
-#include <rosbag/bag.h>
-#include <sensor_msgs/CompressedImage.h>
-#include <sensor_msgs/Image.h>
+#include <yaml-cpp/yaml.h>
 
-#include <memory>
-#include <string>
-#include <tagslam/profiler.hpp>
-#include <vector>
+#include <apriltag_detector/detector.hpp>
+#include <apriltag_msgs/msg/april_tag_detection_array.hpp>
+#include <flex_sync/approximate_sync.hpp>
+#include <flex_sync/exact_sync.hpp>
+#include <flex_sync/live_sync.hpp>
+#include <image_transport/image_transport.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+#include <pluginlib/class_loader.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/image.hpp>
+
+namespace flex_sync
+{
+using Image = sensor_msgs::msg::Image;
+/*
+* Specialize the Subscriber template in the flex_sync namespace to use
+* the image_transport for subscribing instead of the regular transport.
+*/
+template <typename SyncT>
+class Subscriber<SyncT, Image>
+{
+public:
+  using TConstSharedPtr = typename Image::ConstSharedPtr;
+
+  Subscriber(
+    const std::string & topic, rclcpp::Node * node, const rclcpp::QoS & qos,
+    const std::shared_ptr<SyncT> & sync)
+  : topic_(topic), sync_(sync)
+  {
+    const std::string param_name = topic + ".image_transport";
+    sub_ = std::make_shared<image_transport::Subscriber>(
+      image_transport::create_subscription(
+        node, topic,
+        std::bind(
+          &Subscriber<SyncT, Image>::callback, this, std::placeholders::_1),
+        node->get_parameter_or<std::string>(param_name, "raw"),
+        qos.get_rmw_qos_profile()));
+  }
+  void callback(const TConstSharedPtr & msg) { sync_->process(topic_, msg); }
+
+private:
+  std::string topic_;
+  std::shared_ptr<SyncT> sync_;
+  std::shared_ptr<image_transport::Subscriber> sub_;
+};
+}  // namespace flex_sync
 
 namespace tagslam
 {
-using Image = sensor_msgs::Image;
-using ImageConstPtr = sensor_msgs::ImageConstPtr;
-using CompressedImage = sensor_msgs::CompressedImage;
-using CompressedImageConstPtr = sensor_msgs::CompressedImageConstPtr;
-using Odometry = nav_msgs::Odometry;
-using OdometryConstPtr = nav_msgs::OdometryConstPtr;
-using ImageTransport = image_transport::ImageTransport;
+using svec = std::vector<std::string>;
+using Image = sensor_msgs::msg::Image;
+using VecImagePtr = std::vector<Image::ConstSharedPtr>;
+using ApriltagArray = apriltag_msgs::msg::AprilTagDetectionArray;
+using VecApriltagArrayPtr = std::vector<ApriltagArray::ConstSharedPtr>;
+using Odometry = nav_msgs::msg::Odometry;
+using VecOdometryPtr = std::vector<Odometry::ConstSharedPtr>;
 
-class SyncAndDetect
+class SyncAndDetectListener
 {
 public:
-  explicit SyncAndDetect(const ros::NodeHandle & pnh);
-  ~SyncAndDetect();
+  virtual ~SyncAndDetectListener() {}
+  virtual void callbackTags(const VecApriltagArrayPtr & tagMsgs) = 0;
+  virtual void callbackTagsAndOdom(
+    const VecApriltagArrayPtr & tagMsgs, const VecOdometryPtr & odoms) = 0;
+};
 
-  SyncAndDetect(const SyncAndDetect &) = delete;
-  SyncAndDetect & operator=(const SyncAndDetect &) = delete;
-
-  bool initialize();
+class Publisher : public SyncAndDetectListener
+{
+public:
+  Publisher(
+    rclcpp::Node * node, const svec & tag_topics, const svec & odom_topics);
+  void callbackTags(const VecApriltagArrayPtr & tagMsgs) final;
+  void callbackTagsAndOdom(
+    const VecApriltagArrayPtr & tagMsgs, const VecOdometryPtr & odoms) final;
 
 private:
-  typedef flex_sync::ExactSync<Image, Odometry> ExactSync;
-  typedef flex_sync::ApproximateSync<Image, Odometry> ApproximateSync;
-  typedef flex_sync::ExactSync<CompressedImage, Odometry> ExactCompressedSync;
-  typedef flex_sync::ApproximateSync<CompressedImage, Odometry>
-    ApproximateCompressedSync;
-
-  template <class SyncT>
-  class Subscriber
-  {
-  public:
-    //
-    // the subscriber class deals with live ros node subscriptions
-    //
-    Subscriber(
-      const std::vector<std::string> & imageTopics,
-      const std::vector<std::string> & odomTopics, SyncAndDetect * sand,
-      ros::NodeHandle & nh, int syncQueueSize, int subQueueSize,
-      bool imagesAreCompressed)
-    {
-      const std::vector<std::vector<std::string>> tpv = {
-        imageTopics, odomTopics};
-      auto cb = std::bind(
-        &SyncAndDetect::processImages, sand, std::placeholders::_1,
-        std::placeholders::_2);
-      sync_.reset(new SyncT(tpv, cb, syncQueueSize));
-      imageTransport_.reset(new image_transport::ImageTransport(nh));
-      for (size_t i = 0; i < imageTopics.size(); i++) {
-        views_.emplace_back(new View<SyncT>(
-          imageTransport_.get(), imageTopics[i], sync_.get(), subQueueSize,
-          imagesAreCompressed));
-      }
-      for (const auto & topic : odomTopics) {
-        odoms_.emplace_back(
-          new Odom<SyncT>(nh, topic, sync_.get(), subQueueSize));
-      }
-    }
-
-  private:
-    template <class VSyncT>
-    class View
-    {
-    public:
-      View(
-        ImageTransport * it, const std::string & topic, VSyncT * sync, int qs,
-        bool useCompressed)
-      : topic_(topic), sync_(sync)
-      {
-        image_transport::TransportHints th(
-          useCompressed ? "compressed" : "raw");
-        sub_ = it->subscribe(topic, qs, &View::callback, this, th);
-      }
-
-    private:
-      void callback(const ImageConstPtr & image)
-      {
-        sync_->process(topic_, image);
-      }
-      std::string topic_;
-      VSyncT * sync_;
-      image_transport::Subscriber sub_;
-    };
-
-    template <class OSyncT>
-    class Odom
-    {
-    public:
-      Odom(
-        ros::NodeHandle & nh, const std::string & topic, OSyncT * sync, int qs)
-      : topic_(topic), sync_(sync)
-      {
-        sub_ = nh.subscribe(topic, qs, &Odom::callback, this);
-      }
-
-    private:
-      void callback(const OdometryConstPtr & odom)
-      {
-        sync_->process(topic_, odom);
-      }
-      std::string topic_;
-      OSyncT * sync_;
-      ros::Subscriber sub_;
-    };
-    // ------ variables
-    std::shared_ptr<ImageTransport> imageTransport_;
-    std::shared_ptr<SyncT> sync_;
-    std::vector<std::shared_ptr<View<SyncT>>> views_;
-    std::vector<std::shared_ptr<Odom<SyncT>>> odoms_;
-  };
-
-  bool runOnline() const { return (bagFile_.empty()); }
-  void processImages(
-    const std::vector<ImageConstPtr> & msgvec,
-    const std::vector<OdometryConstPtr> & odomvec);
-  void processCompressedImages(
-    const std::vector<CompressedImageConstPtr> & mv,
-    const std::vector<OdometryConstPtr> & odomvec);
-  void processCVMat(
-    const std::vector<std_msgs::Header> & headers,
-    const std::vector<cv::Mat> & grey, const std::vector<cv::Mat> & imgs);
-  void processBag(const std::string & fname);
-  template <typename SyncT, typename T>
-  void iterate_through_bag(
-    const std::vector<std::string> & topics,
-    const std::vector<std::string> & odomTopics, rosbag::View * view,
-    rosbag::Bag * bag, size_t qs,
-    const std::function<void(
-      const std::vector<std::shared_ptr<T const>> &,
-      const std::vector<OdometryConstPtr> &)> & cb)
-  {
-    std::vector<std::vector<std::string>> tpv;
-    tpv.push_back(topics);
-    tpv.push_back(odomTopics);
-    SyncT sync(tpv, cb, qs);
-    for (const rosbag::MessageInstance & m : *view) {
-      OdometryConstPtr odom = m.instantiate<Odometry>();
-      if (odom) {
-        sync.process(m.getTopic(), odom);
-      } else {
-        std::shared_ptr<T const> img = m.instantiate<T>();
-        if (img) {
-          sync.process(m.getTopic(), img);
-        }
-      }
-      if (!ros::ok()) {
-        break;
-      }
-      if (static_cast<int>(fnum_) > maxFrameNumber_) {
-        break;
-      }
-    }
-  }
-
-  // ----------------------------------------------------------
-  ros::NodeHandle nh_;
-  unsigned int fnum_{0};
-  std::string bagFile_;
-  rosbag::Bag outbag_;
-  std::vector<std::string> imageTopics_;
-  std::vector<std::string> odometryTopics_;
-  std::vector<std::string> imageOutputTopics_;
-  std::vector<std::string> tagTopics_;
-  bool imagesAreCompressed_{false};
-  bool annotateImages_{false};
-  bool useApproximateSync_{false};
-  int syncQueueSize_;
-  int maxFrameNumber_;
-  int skip_{1};
-  std::vector<apriltag_ros::ApriltagDetector::Ptr> detectors_;
-  std::string detectorType_;
-  Profiler profiler_;
-  std::shared_ptr<Subscriber<ApproximateSync>> approxSubscriber_;
-  std::shared_ptr<Subscriber<ExactSync>> exactSubscriber_;
-  std::vector<ros::Publisher> pubs_;
-  bool parallelizeDetection_{true};
+  void publishTags(const VecApriltagArrayPtr & tagMsgs);
+  // ---------------- variables -------------------
+  std::vector<rclcpp::Publisher<ApriltagArray>::SharedPtr> tag_pub_;
+  std::vector<rclcpp::Publisher<Odometry>::SharedPtr> odom_pub_;
 };
+
+class SyncAndDetect : public rclcpp::Node
+{
+public:
+  explicit SyncAndDetect(const rclcpp::NodeOptions & opt);
+  ~SyncAndDetect();
+  void setListener(const std::shared_ptr<SyncAndDetectListener> & m);
+  const svec & getImageTopics() const { return (image_topics_); }
+  const svec & getOdomTopics() const { return (odom_topics_); }
+  const svec & getSyncedOdomTopics() const { return (synced_odom_topics_); }
+  const svec & getTagTopics() const { return (tag_topics_); }
+
+private:
+  using ImageExactSync = flex_sync::LiveSync<flex_sync::ExactSync<Image>>;
+  using ImageAndOdomExactSync =
+    flex_sync::LiveSync<flex_sync::ExactSync<Image, Odometry>>;
+  using ImageApproxSync =
+    flex_sync::LiveSync<flex_sync::ApproximateSync<Image>>;
+  using ImageAndOdomApproxSync =
+    flex_sync::LiveSync<flex_sync::ApproximateSync<Image, Odometry>>;
+
+  void getTopics();
+  void parseCameras(const YAML::Node & conf);
+  void parseBodies(const YAML::Node & conf);
+
+  YAML::Node loadFileFromParameter(const std::string & name);
+  void callbackImageAndOdom(
+    const VecImagePtr & imgs, const VecOdometryPtr & odoms);
+  void callbackImage(const VecImagePtr & imgs);
+  size_t getNumberOfTagsDetected() const;
+
+  void subscribe(
+    const std::vector<svec> & topics, const svec & transports,
+    const svec & detectors);
+  size_t tagsFromImages(
+    const VecImagePtr & imgs, VecApriltagArrayPtr * tagMsgs);
+
+  // ----------------- variables ----------------------------------
+  pluginlib::ClassLoader<apriltag_detector::Detector> detector_loader_;
+  std::vector<std::shared_ptr<apriltag_detector::Detector>> detectors_;
+  size_t num_tags_detected_{0};
+  size_t num_frames_{0};
+  svec odom_topics_;
+  svec synced_odom_topics_;
+  svec image_topics_;
+  svec tag_topics_;
+  svec transports_;
+  svec detector_names_;
+  std::shared_ptr<SyncAndDetectListener> listener_;
+  std::shared_ptr<Publisher> pub_;
+  std::shared_ptr<ImageExactSync> image_exact_sync_;
+  std::shared_ptr<ImageAndOdomExactSync> image_odom_exact_sync_;
+  std::shared_ptr<ImageApproxSync> image_approx_sync_;
+  std::shared_ptr<ImageAndOdomApproxSync> image_odom_approx_sync_;
+};
+
 }  // namespace tagslam
 
 #endif  // TAGSLAM__SYNC_AND_DETECT_HPP_

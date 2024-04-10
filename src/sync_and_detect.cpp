@@ -13,294 +13,234 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cv_bridge/cv_bridge.h>
-#include <math.h>
-#include <rosbag/bag.h>
-#include <rosbag/view.h>
-
-#include <boost/range/irange.hpp>
-#include <fstream>
-#include <functional>
-#include <iomanip>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include <algorithm>
+#include <cv_bridge/cv_bridge.hpp>
 #include <tagslam/logging.hpp>
 #include <tagslam/sync_and_detect.hpp>
 
 namespace tagslam
 {
-using boost::irange;
+using std::string;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
-SyncAndDetect::SyncAndDetect(const ros::NodeHandle & pnh) : nh_(pnh) {}
+Publisher::Publisher(
+  rclcpp::Node * node, const svec & tag_topics, const svec & odom_topics)
+{
+  for (const auto & tt : tag_topics) {
+    tag_pub_.push_back(node->create_publisher<ApriltagArray>(tt, 10));
+  }
+  for (const auto & ot : odom_topics) {
+    odom_pub_.push_back(node->create_publisher<Odometry>(ot, 10));
+  }
+}
+
+void Publisher::callbackTags(const VecApriltagArrayPtr & tagMsgs)
+{
+  publishTags(tagMsgs);
+}
+
+void Publisher::callbackTagsAndOdom(
+  const VecApriltagArrayPtr & tagMsgs, const VecOdometryPtr & odoms)
+{
+  publishTags(tagMsgs);
+  for (size_t i = 0; i < odoms.size(); i++) {
+    odom_pub_[i]->publish(*odoms[i]);
+  }
+}
+
+void Publisher::publishTags(const VecApriltagArrayPtr & tagMsgs)
+{
+  for (size_t i = 0; i < tagMsgs.size(); i++) {
+    tag_pub_[i]->publish(*tagMsgs[i]);
+  }
+}
+
+SyncAndDetect::SyncAndDetect(const rclcpp::NodeOptions & opt)
+: Node("sync_and_detect", opt),
+  detector_loader_("apriltag_detector", "apriltag_detector::Detector")
+{
+  getTopics();
+  if (get_parameter_or<bool>("publish", true)) {
+    pub_ = std::make_shared<Publisher>(this, tag_topics_, synced_odom_topics_);
+    listener_ = pub_;
+  }
+  subscribe({image_topics_, odom_topics_}, transports_, detector_names_);
+}
 
 SyncAndDetect::~SyncAndDetect()
 {
-  std::cout << profiler_ << std::endl;
-  for (const auto & d : detectors_) {
-    d->print_profiling_info();
+  image_exact_sync_.reset();
+  image_approx_sync_.reset();
+  image_odom_exact_sync_.reset();
+  image_odom_approx_sync_.reset();
+  detectors_.clear();
+  pub_.reset();
+  detector_loader_.unloadLibraryForClass("apriltag_detector_umich::Detector");
+}
+
+void SyncAndDetect::setListener(
+  const std::shared_ptr<SyncAndDetectListener> & m)
+{
+  listener_ = m;
+}
+
+void SyncAndDetect::getTopics()
+{
+  parseCameras(loadFileFromParameter("cameras"));
+  auto conf = loadFileFromParameter("tagslam_config");
+  if (conf["bodies"]) {
+    parseBodies(conf["bodies"]);
   }
 }
 
-using Family = apriltag_ros::TagFamily;
-bool SyncAndDetect::initialize()
+void SyncAndDetect::parseCameras(const YAML::Node & conf)
 {
-  int tagF;
-  nh_.param<int>("tag_family", tagF, 0);
-  Family tagFamily = static_cast<Family>(tagF);
-  if (
-    tagFamily != Family::tf36h11 && tagFamily != Family::tf25h9 &&
-    tagFamily != Family::tf16h5 && tagFamily != Family::ts41h12 &&
-    tagFamily != Family::ts52h13) {
-    BOMB_OUT("invalid tag family!");
-  }
-  nh_.getParam("odometry_topics", odometryTopics_);
-  if (!nh_.getParam("image_topics", imageTopics_)) {
-    BOMB_OUT("must specify image_topics parameter!");
-  }
-  if (!nh_.getParam("image_output_topics", imageOutputTopics_)) {
-    imageOutputTopics_ = imageTopics_;
-  }
-  if (!nh_.getParam("tag_topics", tagTopics_)) {
-    BOMB_OUT("must specify tagTopics parameter!");
-  }
-  if (tagTopics_.size() != imageTopics_.size()) {
-    BOMB_OUT("must have same number of tag_topics and image_topics!");
-  }
-  nh_.param<std::string>("detector_type", detectorType_, "Mit");
-  int borderWidth;
-  nh_.param<int>("black_border_width", borderWidth, 1);
-  for (const auto & i : irange(0ul, imageTopics_.size())) {
-    (void)i;
-    if (detectorType_ == "Mit") {
-      detectors_.push_back(apriltag_ros::ApriltagDetector::Create(
-        apriltag_ros::DetectorType::Mit, tagFamily));
-    } else if (detectorType_ == "Umich") {
-      detectors_.push_back(apriltag_ros::ApriltagDetector::Create(
-        apriltag_ros::DetectorType::Umich, tagFamily));
-      const int decim = nh_.param<int>("decimate", 1);
-      if (decim > 1) {
-        detectors_.back()->set_decimate(decim);
-      }
-    } else {
-      BOMB_OUT("INVALID DETECTOR TYPE: " << detectorType_);
+  svec cam_names;
+  for (const auto & c : conf) {
+    const auto name = c.first.as<string>();
+    if (name.find("cam") != string::npos) {
+      cam_names.push_back(name);
     }
-    detectors_.back()->set_black_border(borderWidth);
   }
-
-  nh_.param<int>("max_number_frames", maxFrameNumber_, 1000000);
-  nh_.param<int>("skip", skip_, 1);
-  nh_.param<bool>("images_are_compressed", imagesAreCompressed_, false);
-  nh_.param<bool>("annotate_images", annotateImages_, false);
-  nh_.param<bool>("use_approximate_sync", useApproximateSync_, false);
-  nh_.param<int>("sync_queue_size", syncQueueSize_, 100);
-  int subQueueSize, pubQueueSize;
-  nh_.param<int>("subscribe_queue_size", subQueueSize, 10);
-  nh_.param<int>("publish_queue_size", pubQueueSize, 10);
-  nh_.param<bool>("parallelize_detection", parallelizeDetection_, true);
-
-  nh_.param<std::string>("bag_file", bagFile_, "");
-  std::string outfname;
-  nh_.param<std::string>("output_bag_file", outfname, "output.bag");
-  outbag_.open(outfname, rosbag::bagmode::Write);
-  if (runOnline()) {
-    if (useApproximateSync_) {
-      approxSubscriber_.reset(new Subscriber<ApproximateSync>(
-        imageTopics_, odometryTopics_, this, nh_, syncQueueSize_, subQueueSize,
-        imagesAreCompressed_));
-    } else {
-      exactSubscriber_.reset(new Subscriber<ExactSync>(
-        imageTopics_, odometryTopics_, this, nh_, syncQueueSize_, subQueueSize,
-        imagesAreCompressed_));
+  std::sort(cam_names.begin(), cam_names.end(), [](string a, string b) {
+    return a < b;
+  });
+  for (const auto & cam : cam_names) {
+    const auto & c = conf[cam];
+    if (!c["image_topic"] || !c["tag_topic"]) {
+      BOMB_OUT("must specify image_topic and tag_topic for camera " << cam);
     }
-    for (const auto & topic : tagTopics_) {
-      pubs_.push_back(nh_.advertise<apriltag_msgs::ApriltagArrayStamped>(
-        topic, pubQueueSize));
-    }
-  } else {
-    processBag(bagFile_);
+    image_topics_.push_back(c["image_topic"].as<string>());
+    tag_topics_.push_back(c["tag_topic"].as<string>());
+    transports_.push_back(
+      c["image_transport"] ? c["image_transport"].as<string>() : "raw");
+    detector_names_.push_back(
+      c["tag_detector"] ? c["tag_detector"].as<string>() : "umich");
+    LOG_INFO(
+      "camera " << cam << " topic: " << image_topics_.back() << " transp: "
+                << transports_.back() << " detect: " << detector_names_.back());
   }
-  return (true);
 }
 
-void SyncAndDetect::processCVMat(
-  const std::vector<std_msgs::Header> & headers,
-  const std::vector<cv::Mat> & grey, const std::vector<cv::Mat> & imgs)
+void SyncAndDetect::parseBodies(const YAML::Node & conf)
 {
-  int totTags(0);
-  typedef std::vector<apriltag_msgs::Apriltag> TagVec;
-  std::vector<TagVec> allTags(grey.size());
-  profiler_.reset("detect");
-  if (parallelizeDetection_) {
-#pragma omp parallel for
-    for (int i = 0; i < static_cast<int>(grey.size()); i++) {
-      allTags[i] = detectors_[i]->Detect(grey[i]);
-    }
-  } else {
-    for (int i = 0; i < static_cast<int>(grey.size()); i++) {
-      allTags[i] = detectors_[i]->Detect(grey[i]);
-    }
-  }
-  profiler_.record("detect", grey.size());
-
-  sensor_msgs::CompressedImage msg;
-  msg.format = "jpeg";
-  std::vector<int> param(2);
-  param[0] = cv::IMWRITE_JPEG_QUALITY;
-  param[1] = 80;  // default(95) 0-100
-
-  for (const auto i : irange(0ul, grey.size())) {
-    const std::vector<apriltag_msgs::Apriltag> tags = allTags[i];
-    totTags += tags.size();
-    apriltag_msgs::ApriltagArrayStamped tagMsg;
-    tagMsg.header = headers[i];
-    for (const auto & tag : tags) {
-      tagMsg.apriltags.push_back(tag);
-    }
-    if (headers[i].stamp.toSec() != 0) {
-      outbag_.write<apriltag_msgs::ApriltagArrayStamped>(
-        tagTopics_[i], headers[i].stamp, tagMsg);
-      if (runOnline()) {
-        pubs_[i].publish(tagMsg);
+  for (const auto & body : conf) {
+    if (body.IsMap()) {
+      for (const auto & bm : body) {
+        auto node = bm.second;
+        if (node["odom_topic"]) {
+          const auto topic = node["odom_topic"].as<std::string>();
+          odom_topics_.push_back(topic);
+          synced_odom_topics_.push_back(topic + "_synced");
+          LOG_INFO(
+            "body " << bm.first.as<std::string>()
+                    << " has odom topic: " << topic);
+        }
       }
     }
-    if (annotateImages_) {
-      cv::Mat colorImg = imgs[i].clone();
-      if (!tags.empty()) {
-        apriltag_ros::DrawApriltags(colorImg, tags);
-      }
-
-      msg.header = headers[i];
-      cv::imencode(".jpg", colorImg, msg.data, param);
-
-      if (headers[i].stamp.toSec() != 0)
-        outbag_.write<sensor_msgs::CompressedImage>(
-          imageOutputTopics_[i], headers[i].stamp, msg);
-    }
-  }
-  ROS_INFO_STREAM(
-    "frame " << fnum_ << " " << headers[0].stamp << " detected " << totTags
-             << " tags with " << grey.size() << " cameras");
-  fnum_++;
-}
-
-void SyncAndDetect::processCompressedImages(
-  const std::vector<CompressedImageConstPtr> & msgvec,
-  const std::vector<OdometryConstPtr> & odom)
-{
-  if (msgvec.empty()) {
-    ROS_WARN("got empty image vector!");
-    return;
-  }
-  if (fnum_ % skip_ != 0) {
-    ROS_INFO_STREAM("skipped frame number " << fnum_);
-    fnum_++;
-    return;
-  }
-  std::vector<cv::Mat> images, grey_images;
-  std::vector<std_msgs::Header> headers;
-  for (const auto i : irange(0ul, msgvec.size())) {
-    const auto & img = msgvec[i];
-    cv::Mat im1 =
-      cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8)->image;
-    cv::Mat im;
-    cv::cvtColor(im1, im, cv::COLOR_BayerBG2BGR);
-    images.push_back(im);
-    cv::Mat im_grey;
-    cv::cvtColor(im, im_grey, cv::COLOR_BGR2GRAY);
-    grey_images.push_back(im_grey);
-    headers.push_back(img->header);
-  }
-  processCVMat(headers, grey_images, images);
-  for (const auto i : irange(0ul, odom.size())) {
-    outbag_.write<Odometry>(odometryTopics_[i], odom[i]->header.stamp, odom[i]);
   }
 }
 
-void SyncAndDetect::processImages(
-  const std::vector<ImageConstPtr> & msgvec,
-  const std::vector<OdometryConstPtr> & odom)
+YAML::Node SyncAndDetect::loadFileFromParameter(const string & name)
 {
-  if (msgvec.empty()) {
-    ROS_WARN("got empty image vector!");
-    return;
+  const string p = get_parameter_or<string>(name, "");
+  if (p.empty()) {
+    BOMB_OUT("parameter " << name << " must be specified and non-empty!");
   }
-  if (fnum_ % skip_ != 0) {
-    ROS_INFO_STREAM("skipped frame number " << fnum_);
-    fnum_++;
-    return;
+  YAML::Node config = YAML::LoadFile(p);
+  if (config.IsNull()) {
+    BOMB_OUT("cannot open config file: " << p);
   }
-  std::vector<cv::Mat> images, grey_images;
-  std::vector<std_msgs::Header> headers;
-  for (const auto i : irange(0ul, msgvec.size())) {
-    const auto & img = msgvec[i];
-    cv::Mat im =
-      cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::BGR8)->image;
-    images.push_back(im);
-    cv::Mat im_grey =
-      cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8)->image;
-    grey_images.push_back(im_grey);
-    headers.push_back(img->header);
-  }
-  processCVMat(headers, grey_images, images);
+  return (config);
+}
 
-  for (const auto i : irange(0ul, odom.size())) {
-    outbag_.write<Odometry>(odometryTopics_[i], odom[i]->header.stamp, odom[i]);
+void SyncAndDetect::callbackImageAndOdom(
+  const VecImagePtr & imgs, const VecOdometryPtr & odoms)
+{
+  VecApriltagArrayPtr tagMsgs;
+  num_tags_detected_ += tagsFromImages(imgs, &tagMsgs);
+  num_frames_++;
+  if (num_frames_ % 10 == 0) {
+    LOG_INFO("frame " << num_frames_ << " total tags: " << num_tags_detected_);
+  }
+  if (listener_) {
+    listener_->callbackTagsAndOdom(tagMsgs, odoms);
   }
 }
 
-void SyncAndDetect::processBag(const std::string & fname)
+void SyncAndDetect::callbackImage(const VecImagePtr & imgs)
 {
-  rosbag::Bag bag;
-  bag.open(fname, rosbag::bagmode::Read);
-  ROS_INFO_STREAM("playing from file: " << fname);
-  double start_time(0), duration(-1);
-  nh_.param<double>("start_time", start_time, 0);
-  nh_.param<double>("duration", duration, -1);
-  ros::Time t_start =
-    rosbag::View(bag).getBeginTime() + rclcpp::Duration(start_time);
-  ros::Time t_end =
-    duration >= 0 ? t_start + rclcpp::Duration(duration) : ros::TIME_MAX;
-  std::vector<std::string> allTopics = imageTopics_;
-  allTopics.insert(
-    allTopics.end(), odometryTopics_.begin(), odometryTopics_.end());
-  rosbag::View view(bag, rosbag::TopicQuery(allTopics), t_start, t_end);
-  for (const auto i : irange(0ul, tagTopics_.size())) {
-    ROS_INFO_STREAM(
-      "image topic: " << imageTopics_[i] << " maps to: " << tagTopics_[i]);
+  VecApriltagArrayPtr tagMsgs;
+  num_tags_detected_ += tagsFromImages(imgs, &tagMsgs);
+  num_frames_++;
+  if (num_frames_ % 10 == 0) {
+    LOG_INFO("frame " << num_frames_ << " total tags: " << num_tags_detected_);
   }
+  if (listener_) {
+    listener_->callbackTags(tagMsgs);
+  }
+}
 
-  if (imagesAreCompressed_) {
-    if (useApproximateSync_) {
-      iterate_through_bag<ApproximateCompressedSync, CompressedImage>(
-        imageTopics_, odometryTopics_, &view, &outbag_, syncQueueSize_,
-        std::bind(
-          &SyncAndDetect::processCompressedImages, this, std::placeholders::_1,
-          std::placeholders::_2));
+size_t SyncAndDetect::getNumberOfTagsDetected() const
+{
+  return (num_tags_detected_);
+}
+void SyncAndDetect::subscribe(
+  const std::vector<svec> & topics, const svec & transports,
+  const svec & detectors)
+{
+  assert(topics.size() == 1 || topics.size() == 2);
+  const auto & imgs = topics[0];
+  assert(imgs.size() == transports.size());
+  assert(imgs.size() == detectors.size());
+
+  for (size_t i = 0; i < imgs.size(); i++) {
+    const auto & topic = imgs[i];
+    declare_parameter<string>(topic + ".image_transport", transports[i]);
+    detectors_.push_back(detector_loader_.createSharedInstance(
+      "apriltag_detector_" + detectors[i] + "::Detector"));
+  }
+  const bool use_approx_sync =
+    get_parameter_or<bool>("use_approximate_sync", true);
+  LOG_INFO("using approximate sync: " << (use_approx_sync ? "YES" : "NO"));
+  const int qs = 10;  // queue size
+  if (topics.size() == 1) {
+    if (use_approx_sync) {
+      image_approx_sync_ = std::make_shared<ImageApproxSync>(
+        this, topics, std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
     } else {
-      iterate_through_bag<ExactCompressedSync, CompressedImage>(
-        imageTopics_, odometryTopics_, &view, &outbag_, syncQueueSize_,
-        std::bind(
-          &SyncAndDetect::processCompressedImages, this, std::placeholders::_1,
-          std::placeholders::_2));
+      image_exact_sync_ = std::make_shared<ImageExactSync>(
+        this, topics, std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
     }
   } else {
-    if (useApproximateSync_) {
-      iterate_through_bag<ApproximateSync, sensor_msgs::Image>(
-        imageTopics_, odometryTopics_, &view, &outbag_, syncQueueSize_,
-        std::bind(
-          &SyncAndDetect::processImages, this, std::placeholders::_1,
-          std::placeholders::_2));
+    if (use_approx_sync) {
+      image_odom_approx_sync_ = std::make_shared<ImageAndOdomApproxSync>(
+        this, topics, std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
     } else {
-      iterate_through_bag<ExactSync, sensor_msgs::Image>(
-        imageTopics_, odometryTopics_, &view, &outbag_, syncQueueSize_,
-        std::bind(
-          &SyncAndDetect::processImages, this, std::placeholders::_1,
-          std::placeholders::_2));
+      image_odom_exact_sync_ = std::make_shared<ImageAndOdomExactSync>(
+        this, topics, std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
     }
   }
-  bag.close();
-  outbag_.close();
-  ros::shutdown();
 }
 
+size_t SyncAndDetect::tagsFromImages(
+  const VecImagePtr & imgs, VecApriltagArrayPtr * tagMsgs)
+{
+  assert(detectors_.size() == imgs.size());
+  size_t num_tags{0};
+  for (size_t i = 0; i < imgs.size(); i++) {
+    const auto & img = imgs[i];
+    auto tags = std::make_shared<ApriltagArray>();
+    tagMsgs->push_back(tags);
+    tags->header = img->header;
+    cv_bridge::CvImageConstPtr cvImg = cv_bridge::toCvShare(img, "mono8");
+    if (!cvImg) {
+      BOMB_OUT("cannot convert image to mono!");
+    }
+    detectors_[i]->detect(cvImg->image, tags.get());
+    num_tags += tags->detections.size();
+  }
+  return (num_tags);
+}
 }  // namespace tagslam

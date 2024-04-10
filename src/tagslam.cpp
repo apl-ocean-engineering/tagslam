@@ -323,7 +323,7 @@ static void makeTopic(
   md.name = topic;
   md.type = type;
   md.serialization_format = rmw_get_serialization_format();
-  md.offered_qos_profiles = "";
+  // md.offered_qos_profiles = "";
   writer->create_topic(md);
 }
 

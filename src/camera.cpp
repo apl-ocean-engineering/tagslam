@@ -28,10 +28,10 @@ CameraPtr Camera::parse_camera(const string & name, const YAML::Node & config)
   Camera & cam = *camPtr;  // short hand
   cam.name_ = name;
   cam.intrinsics_ = CameraIntrinsics::parse(config);
-  cam.imageTopic_ = yaml::parse<string>(config, "rostopic");
-  cam.tagTopic_ = yaml::parse<string>(config, "tagtopic", "");
+  cam.imageTopic_ = yaml::parse<string>(config, "image_topic");
+  cam.tagTopic_ = yaml::parse<string>(config, "tag_topic", "");
   cam.rigName_ = yaml::parse<string>(config, "rig_body");
-  cam.frameId_ = yaml::parse<string>(config, "frameId", cam.name_);
+  cam.frameId_ = yaml::parse<string>(config, "frame_id", cam.name_);
   double wiggleR = yaml::parse<double>(config, "wiggle_rotation", 0.00001);
   double wiggleT = yaml::parse<double>(config, "wiggle_translation", 0.00001);
   cam.wiggle_ = PoseNoise::make(wiggleR, wiggleT);

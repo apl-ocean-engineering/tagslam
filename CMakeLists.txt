@@ -16,14 +16,6 @@
 cmake_minimum_required(VERSION 3.22)
 project(tagslam)
 
-set(USE_ADDRESS_SANITIZER OFF CACHE BOOL "compile with address sanitizer support")
-if(USE_ADDRESS_SANITIZER)
-  set(CMAKE_CXX_FLAGS "-fsanitize=address  -fsanitize=leak -g")
-  set(CMAKE_C_FLAGS "-fsanitize=leak -g")
-  set(CMAKE_EXE_LINKER_FLAGS "-fsanitize=address  -fsanitize=leak")
-  set(CMAKE_MODULE_LINKER_FLAGS "-fsanitize=address  -fsanitize=leak")
-endif()
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
@@ -59,13 +51,13 @@ set(tagslam_ament_dependencies
 set(sync_and_detect_ament_dependencies
   "apriltag_msgs"
   "apriltag_detector"
+  "cv_bridge"
   "flex_sync"
   "image_transport"
   "pluginlib"
   "nav_msgs"
   "rclcpp"
-  "sensor_msgs"
-  )
+  "sensor_msgs")
 
 set(all_ament_dependencies
   ${tagslam_ament_dependencies}
@@ -149,18 +141,48 @@ target_compile_features(${PROJECT_NAME}_node PRIVATE cxx_std_17)
 # -------- processing from bag
 #
 add_executable(${PROJECT_NAME}_from_bag src/${PROJECT_NAME}_from_bag.cpp)
-ament_target_dependencies(${PROJECT_NAME}_from_bag ${tagslam_ament_dependencies})
+ament_target_dependencies(${PROJECT_NAME}_from_bag
+  ${tagslam_ament_dependencies}
+  rosbag2_transport)
 target_link_libraries(${PROJECT_NAME}_from_bag ${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME}_from_bag PRIVATE include)
 target_compile_features(${PROJECT_NAME}_from_bag PRIVATE cxx_std_17)
 
 #
-# -------- sync-and-detect
+# -------- sync-and-detect shared library
 #
+add_library(sync_and_detect SHARED
+  src/sync_and_detect.cpp
+)
+ament_target_dependencies(sync_and_detect ${sync_and_detect_ament_dependencies})
+target_link_libraries(sync_and_detect yaml-cpp)
+target_compile_features(sync_and_detect PRIVATE cxx_std_17)
+
+target_include_directories(
+    sync_and_detect
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
+
+rclcpp_components_register_nodes(sync_and_detect "${PROJECT_NAME}::SyncAndDetect")
+
+#
+# -------- sync-and-detect from bag
+#
+
+add_executable(sync_and_detect_from_bag src/sync_and_detect_from_bag.cpp)
+ament_target_dependencies(sync_and_detect_from_bag rosbag2_transport)
+target_link_libraries(sync_and_detect_from_bag sync_and_detect yaml-cpp)
+
+target_include_directories(sync_and_detect_from_bag PRIVATE include)
+target_compile_features(sync_and_detect_from_bag PRIVATE cxx_std_17)
+
+#
+# -------- sync-and-detect node
+#
+
 add_executable(sync_and_detect_node src/sync_and_detect_node.cpp)
-ament_target_dependencies(sync_and_detect_node
-  ${sync_and_detect_ament_dependencies} cv_bridge)
-target_link_libraries(sync_and_detect_node yaml-cpp)
+target_link_libraries(sync_and_detect_node sync_and_detect)
 
 target_include_directories(sync_and_detect_node PRIVATE include)
 target_compile_features(sync_and_detect_node PRIVATE cxx_std_17)
@@ -175,6 +197,7 @@ install(TARGETS
   ${PROJECT_NAME}_node
   ${PROJECT_NAME}_from_bag
   sync_and_detect_node
+  sync_and_detect_from_bag
   DESTINATION lib/${PROJECT_NAME}/)
 
 # the shared library goes into the global lib dir so it can
@@ -182,6 +205,7 @@ install(TARGETS
 
 install(TARGETS
   ${PROJECT_NAME}
+  sync_and_detect
   DESTINATION lib
 )
 install(PROGRAMS
