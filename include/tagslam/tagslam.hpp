@@ -31,7 +31,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rosbag2_cpp/writer.hpp>
 #include <rosgraph_msgs/msg/clock.hpp>
-#include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <set>
 #include <std_msgs/msg/header.hpp>
@@ -67,8 +66,6 @@ class TagSLAM : public TagFactory, public rclcpp::Node
   using OdometryConstPtr = Odometry::ConstSharedPtr;
   using Image = sensor_msgs::msg::Image;
   using ImageConstPtr = Image::ConstSharedPtr;
-  using CompressedImage = sensor_msgs::msg::CompressedImage;
-  using CompressedImageConstPtr = CompressedImage::ConstSharedPtr;
   using TFMessage = tf2_msgs::msg::TFMessage;
   using Trigger = std_srvs::srv::Trigger;
   using Point = apriltag_msgs::msg::Point;
@@ -76,18 +73,10 @@ class TagSLAM : public TagFactory, public rclcpp::Node
   using Header = std_msgs::msg::Header;
   using Clock = rosgraph_msgs::msg::Clock;
 
-  using ExactSync = flex_sync::ExactSync<TagArray, Image, Odometry>;
-  using ApproxSync = flex_sync::ApproximateSync<TagArray, Image, Odometry>;
+  using ExactSync = flex_sync::ExactSync<TagArray, Odometry>;
+  using ApproxSync = flex_sync::ApproximateSync<TagArray, Odometry>;
   using LiveExactSync = flex_sync::LiveSync<ExactSync>;
   using LiveApproxSync = flex_sync::LiveSync<ApproxSync>;
-
-  using ExactCompressedSync =
-    flex_sync::ExactSync<TagArray, CompressedImage, Odometry>;
-  using ApproxCompressedSync =
-    flex_sync::ApproximateSync<TagArray, CompressedImage, Odometry>;
-
-  using LiveExactCompressedSync = flex_sync::LiveSync<ExactCompressedSync>;
-  using LiveApproxCompressedSync = flex_sync::LiveSync<ApproxCompressedSync>;
 
   using PoseCacheMap = std::map<
     string, PoseWithNoise, std::less<string>,
@@ -101,17 +90,15 @@ public:
   TagConstPtr findTag(int tagId) final;
 
   // ------ own methods
+  const std::vector<std::string> getTagTopics() const;
+  const std::vector<std::string> getOdomTopics() const;
+  const std::vector<std::string> getPublishedTopics() const;
   bool initialize();
   void finalize(bool optimize = true);
   void subscribe();
 
   void syncCallback(
     const std::vector<TagArrayConstPtr> & msgvec1,
-    const std::vector<ImageConstPtr> & msgvec2,
-    const std::vector<OdometryConstPtr> & msgvec3);
-  void syncCallbackCompressed(
-    const std::vector<TagArrayConstPtr> & msgvec1,
-    const std::vector<CompressedImageConstPtr> & msgvec2,
     const std::vector<OdometryConstPtr> & msgvec3);
 
 private:
@@ -220,9 +207,7 @@ private:
   std::vector<Path> trajectory_;
   std::unique_ptr<rosbag2_cpp::Writer> outputBag_;
   string fixedFrame_;
-  bool writeDebugImages_;
   bool useApproximateSync_;
-  bool hasCompressedImages_;
   bool useFakeOdom_{false};
   bool publishAck_{false};
   bool amnesia_{false};
@@ -252,8 +237,6 @@ private:
   string inBagFile_;
   std::shared_ptr<LiveExactSync> liveExactSync_;
   std::shared_ptr<LiveApproxSync> liveApproxSync_;
-  std::shared_ptr<LiveExactCompressedSync> liveExactCompressedSync_;
-  std::shared_ptr<LiveApproxCompressedSync> liveApproxCompressedSync_;
 
   std::unordered_map<int, std::vector<ReMap>> tagRemap_;
   std::vector<std::map<uint64_t, std::set<int>>> squash_;

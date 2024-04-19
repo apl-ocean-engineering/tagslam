@@ -61,7 +61,7 @@ SyncAndDetect::SyncAndDetect(const rclcpp::NodeOptions & opt)
   detector_loader_("apriltag_detector", "apriltag_detector::Detector")
 {
   getTopics();
-  if (get_parameter_or<bool>("publish", true)) {
+  if (declare_parameter<bool>("publish", true)) {
     pub_ = std::make_shared<Publisher>(this, tag_topics_, synced_odom_topics_);
     listener_ = pub_;
   }
@@ -144,7 +144,7 @@ void SyncAndDetect::parseBodies(const YAML::Node & conf)
 
 YAML::Node SyncAndDetect::loadFileFromParameter(const string & name)
 {
-  const string p = get_parameter_or<string>(name, "");
+  const string p = declare_parameter<string>(name, "");
   if (p.empty()) {
     BOMB_OUT("parameter " << name << " must be specified and non-empty!");
   }
@@ -202,7 +202,7 @@ void SyncAndDetect::subscribe(
       "apriltag_detector_" + detectors[i] + "::Detector"));
   }
   const bool use_approx_sync =
-    get_parameter_or<bool>("use_approximate_sync", true);
+    declare_parameter<bool>("use_approximate_sync", true);
   LOG_INFO("using approximate sync: " << (use_approx_sync ? "YES" : "NO"));
   const int qs = 10;  // queue size
   if (topics.size() == 1) {

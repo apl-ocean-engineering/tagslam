@@ -138,6 +138,7 @@ const std::map<std::string, OptimizerMode> optModeMap = {
 TagSLAM::TagSLAM(const rclcpp::NodeOptions & options) : Node("tagslam", options)
 {
   node_ = this;
+  tfBroadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
   initialGraph_.reset(new Graph());
   // Alias the graph to the initial graph. That way during startup,
   // all updates that are done on graph_, are also done on the initial
@@ -145,6 +146,7 @@ TagSLAM::TagSLAM(const rclcpp::NodeOptions & options) : Node("tagslam", options)
   graph_ = initialGraph_;
   graph_->setVerbosity("SILENT");
   initialize();
+  subscribe();
 }
 
 TagConstPtr TagSLAM::findTag(int tagId)
@@ -197,10 +199,7 @@ void TagSLAM::readParams()
   outDir_ = declare_parameter("output_directory", ".");
   fixedFrame_ = declare_parameter<string>("fixed_frame_id", "map");
   maxFrameNum_ = declare_parameter<int>("max_number_of_frames", 1000000);
-  writeDebugImages_ = declare_parameter<bool>("write_debug_images", false);
   publishAck_ = declare_parameter<bool>("publish_ack", false);
-  hasCompressedImages_ =
-    declare_parameter<bool>("has_compressed_images", false);
 }
 
 static YAML::Node readConfig(
@@ -280,38 +279,20 @@ bool TagSLAM::initialize()
 void TagSLAM::subscribe()
 {
   std::vector<std::vector<std::string>> topics = makeTopics();
-  if (hasCompressedImages_) {
-    if (useApproximateSync_) {
-      liveApproxCompressedSync_.reset(new LiveApproxCompressedSync(
-        node_, topics,
-        std::bind(
-          &TagSLAM::syncCallbackCompressed, this, std::placeholders::_1,
-          std::placeholders::_2, std::placeholders::_3),
-        syncQueueSize_));
-    } else {
-      liveExactCompressedSync_.reset(new LiveExactCompressedSync(
-        node_, topics,
-        std::bind(
-          &TagSLAM::syncCallbackCompressed, this, std::placeholders::_1,
-          std::placeholders::_2, std::placeholders::_3),
-        syncQueueSize_));
-    }
+  if (useApproximateSync_) {
+    liveApproxSync_.reset(new LiveApproxSync(
+      node_, topics,
+      std::bind(
+        &TagSLAM::syncCallback, this, std::placeholders::_1,
+        std::placeholders::_2),
+      syncQueueSize_));
   } else {
-    if (useApproximateSync_) {
-      liveApproxSync_.reset(new LiveApproxSync(
-        node_, topics,
-        std::bind(
-          &TagSLAM::syncCallback, this, std::placeholders::_1,
-          std::placeholders::_2, std::placeholders::_3),
-        syncQueueSize_));
-    } else {
-      liveExactSync_.reset(new LiveExactSync(
-        node_, topics,
-        std::bind(
-          &TagSLAM::syncCallback, this, std::placeholders::_1,
-          std::placeholders::_2, std::placeholders::_3),
-        syncQueueSize_));
-    }
+    liveExactSync_.reset(new LiveExactSync(
+      node_, topics,
+      std::bind(
+        &TagSLAM::syncCallback, this, std::placeholders::_1,
+        std::placeholders::_2),
+      syncQueueSize_));
   }
 }
 
@@ -511,42 +492,42 @@ void TagSLAM::readCameras(const YAML::Node & config)
   }
 }
 
-template <typename T>
-static void process_images(
-  const std::vector<T> & msgvec, std::vector<cv::Mat> * images)
+const std::vector<std::string> TagSLAM::getTagTopics() const
 {
-  images->clear();
-  for (size_t i = 0; i < msgvec.size(); i++) {
-    const auto & img = msgvec[i];
-    cv::Mat im =
-      cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::BGR8)->image;
-    images->push_back(im);
+  std::vector<std::string> tagTopics;
+  for (const auto & c : cameras_) {
+    tagTopics.push_back(c->getTagTopic());
   }
+  return (tagTopics);
+}
+
+const std::vector<std::string> TagSLAM::getOdomTopics() const
+{
+  std::vector<std::string> odomTopics;
+  for (const auto & body : bodies_) {
+    if (!body->getOdomTopic().empty()) {
+      odomTopics.push_back(body->getOdomTopic());
+    }
+  }
+  return (odomTopics);
+}
+
+const std::vector<std::string> TagSLAM::getPublishedTopics() const
+{
+  std::vector<std::string> pubTopics;
+  for (const auto & body : bodies_) {
+    if (!body->getOdomTopic().empty()) {
+      pubTopics.push_back("/tagslam/odom/body_" + body->getName());
+    }
+  }
+  return (pubTopics);
 }
 
 std::vector<std::vector<std::string>> TagSLAM::makeTopics() const
 {
-  std::vector<std::vector<string>> topics(3);
-  for (const auto & body : bodies_) {
-    if (!body->getOdomTopic().empty()) {
-      topics[2].push_back(body->getOdomTopic());
-    }
-  }
-  for (const auto & cam : cameras_) {
-    if (cam->getTagTopic().empty()) {
-      BOMB_OUT("camera " << cam->getName() << " no tag topic!");
-    }
-    topics[0].push_back(cam->getTagTopic());
-    if (writeDebugImages_) {
-      if (cam->getImageTopic().empty()) {
-        BOMB_OUT("camera " << cam->getName() << " no image topic!");
-      }
-      topics[1].push_back(cam->getImageTopic());
-    }
-  }
-  LOG_INFO("number of tag   topics: " << topics[0].size());
-  LOG_INFO("number of image topics: " << topics[1].size());
-  LOG_INFO("number of odom  topics: " << topics[2].size());
+  std::vector<std::vector<string>> topics;
+  topics.push_back(getTagTopics());
+  topics.push_back(getOdomTopics());
   return (topics);
 }
 
@@ -678,25 +659,8 @@ void TagSLAM::publishTransforms(const uint64_t t, bool orig)
 
 void TagSLAM::syncCallback(
   const std::vector<TagArrayConstPtr> & msgvec1,
-  const std::vector<ImageConstPtr> & msgvec2,
   const std::vector<OdometryConstPtr> & msgvec3)
 {
-  profiler_.reset("processImages");
-  process_images<ImageConstPtr>(msgvec2, &images_);
-  profiler_.record("processImages");
-  profiler_.reset("processTagsAndOdom");
-  processTagsAndOdom(msgvec1, msgvec3);
-  profiler_.record("processTagsAndOdom");
-}
-
-void TagSLAM::syncCallbackCompressed(
-  const std::vector<TagArrayConstPtr> & msgvec1,
-  const std::vector<CompressedImageConstPtr> & msgvec2,
-  const std::vector<OdometryConstPtr> & msgvec3)
-{
-  profiler_.reset("processCompressedImages");
-  process_images<CompressedImageConstPtr>(msgvec2, &images_);
-  profiler_.record("processCompressedImages");
   profiler_.reset("processTagsAndOdom");
   processTagsAndOdom(msgvec1, msgvec3);
   profiler_.record("processTagsAndOdom");

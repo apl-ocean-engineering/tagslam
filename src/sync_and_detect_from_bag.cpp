@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rosbag2_transport/player.hpp>
 #include <rosbag2_transport/recorder.hpp>
+#include <tagslam/enhanced_player.hpp>
 #include <tagslam/logging.hpp>
 #include <tagslam/sync_and_detect.hpp>
 
@@ -22,21 +22,6 @@ static rclcpp::Logger get_logger()
 {
   return (rclcpp::get_logger("sync_and_detect_from_bag"));
 }
-
-class MyPlayer : public rosbag2_transport::Player
-{
-public:
-  MyPlayer(const std::string & name, const rclcpp::NodeOptions & opt)
-  : rosbag2_transport::Player(name, opt)
-  {
-  }
-
-  std::unordered_map<std::string, std::shared_ptr<rclcpp::GenericPublisher>>
-  getPublishers()
-  {
-    return (rosbag2_transport::Player::get_publishers());
-  }
-};
 
 static void printTopics(
   const std::string & label, const std::vector<std::string> & topics)
@@ -53,18 +38,6 @@ static std::vector<std::string> merge(
   return (all);
 }
 
-static void checkThatTopicsAreInBag(
-  const std::vector<std::string> & topics,
-  const std::shared_ptr<MyPlayer> & player_node)
-{
-  const auto pubs = player_node->getPublishers();
-  for (const auto & topic : topics) {
-    if (pubs.find(topic) == pubs.end()) {
-      LOG_ERROR("topic not in bag, sync will hang: " << topic);
-    }
-  }
-}
-
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
@@ -73,7 +46,6 @@ int main(int argc, char ** argv)
 
   rclcpp::NodeOptions node_options;
   node_options.use_intra_process_comms(true);
-  node_options.automatically_declare_parameters_from_overrides(true);
 
   auto sync_node = std::make_shared<tagslam::SyncAndDetect>(node_options);
   exec.add_node(sync_node);
@@ -87,7 +59,7 @@ int main(int argc, char ** argv)
   printTopics("recorded topic", recorded_topics);
 
   const std::string in_uri =
-    sync_node->get_parameter_or<std::string>("in_bag", "");
+    sync_node->declare_parameter<std::string>("in_bag", "");
   if (in_uri.empty()) {
     LOG_ERROR("must provide valid in_bag parameter!");
     return (-1);
@@ -99,17 +71,21 @@ int main(int argc, char ** argv)
     {Parameter("storage.uri", in_uri), Parameter("play.topics", in_topics),
      Parameter("play.disable_keyboard_controls", true)});
   auto player_node =
-    std::make_shared<MyPlayer>("rosbag_player", player_options);
+    std::make_shared<tagslam::EnhancedPlayer>("rosbag_player", player_options);
   exec.add_node(player_node);
 
-  checkThatTopicsAreInBag(in_topics, player_node);
+  if (!player_node->hasAllTopics(in_topics)) {
+    LOG_ERROR("topics not in bag, sync will hang!");
+  } else {
+    LOG_INFO("player found all topics!");
+  }
 
   const std::string out_uri =
-    sync_node->get_parameter_or<std::string>("out_bag", "");
+    sync_node->declare_parameter<std::string>("out_bag", "");
 
-  std::shared_ptr<rosbag2_transport::Recorder> recorder_node;
   if (!out_uri.empty()) {
     LOG_INFO("writing detected tags to bag: " << out_uri);
+    std::shared_ptr<rosbag2_transport::Recorder> recorder_node;
     rclcpp::NodeOptions recorder_options;
     recorder_options.parameter_overrides(
       {Parameter("storage.uri", out_uri),
@@ -119,6 +95,8 @@ int main(int argc, char ** argv)
     recorder_node = std::make_shared<rosbag2_transport::Recorder>(
       "rosbag_recorder", recorder_options);
     exec.add_node(recorder_node);
+  } else {
+    LOG_INFO("no out_bag parameter set, publishing as messages!");
   }
 
   while (
