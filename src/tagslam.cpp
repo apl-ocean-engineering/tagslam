@@ -24,6 +24,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <cmath>
+#include <filesystem>
 #include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <iomanip>
@@ -311,13 +312,22 @@ static void makeTopic(
 void TagSLAM::openOutputBag(const string & bag_name)
 {
   outputBag_ = std::make_unique<rosbag2_cpp::Writer>();
+  if (bag_name.find('*') != std::string::npos) {
+    BOMB_OUT("cannot have wildcards in bag name!");
+  }
+  using Path = std::filesystem::path;
+  if (std::filesystem::exists(Path(bag_name) / Path("metadata.yaml"))) {
+    LOG_INFO("removing existing bag: " << bag_name);
+    std::filesystem::remove_all(bag_name);
+  }
+
   outputBag_->open(bag_name);
   makeTopic(outputBag_.get(), "/tf2", "tf2_msgs/msg/TFMessage");
   struct rosbag2_storage::TopicMetadata md;
   for (const auto & body : bodies_) {
     makeTopic(
       outputBag_.get(), "/tagslam/odom/body_" + body->getName(),
-      "nav_msg/msg/Odometry");
+      "nav_msgs/msg/Odometry");
   }
 }
 

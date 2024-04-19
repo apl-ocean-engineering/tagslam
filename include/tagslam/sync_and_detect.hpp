@@ -28,6 +28,7 @@
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <set>
 
 namespace flex_sync
 {
@@ -147,6 +148,7 @@ private:
   svec tag_topics_;
   svec transports_;
   svec detector_names_;
+  std::set<std::string> detector_types_;
   std::shared_ptr<SyncAndDetectListener> listener_;
   std::shared_ptr<Publisher> pub_;
   std::shared_ptr<ImageExactSync> image_exact_sync_;

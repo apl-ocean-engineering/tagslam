@@ -74,6 +74,7 @@ int main(int argc, char ** argv)
      Parameter("play.disable_keyboard_controls", true)});
   auto player_node =
     std::make_shared<tagslam::EnhancedPlayer>("rosbag_player", player_options);
+  player_node->get_logger().set_level(rclcpp::Logger::Level::Warn);
   exec.add_node(player_node);
 
   if (!player_node->hasAllTopics(in_topics)) {
@@ -99,12 +100,11 @@ int main(int argc, char ** argv)
     LOG_INFO("no out_bag parameter set, publishing as messages!");
   }
 
-  while (
-    !player_node->wait_for_playback_to_finish(std::chrono::microseconds(0)) &&
-    rclcpp::ok()) {
-    player_node->play_next();
+  while (player_node->play_next() && rclcpp::ok()) {
     exec.spin_some();
   }
+  tagslam_node->finalize();
+
   rclcpp::shutdown();
   return 0;
 }

@@ -76,7 +76,10 @@ SyncAndDetect::~SyncAndDetect()
   image_odom_approx_sync_.reset();
   detectors_.clear();
   pub_.reset();
-  detector_loader_.unloadLibraryForClass("apriltag_detector_umich::Detector");
+  for (const auto & type : detector_types_) {
+    detector_loader_.unloadLibraryForClass(
+      "apriltag_detector_" + type + "::Detector");
+  }
 }
 
 void SyncAndDetect::setListener(
@@ -200,6 +203,7 @@ void SyncAndDetect::subscribe(
     declare_parameter<string>(topic + ".image_transport", transports[i]);
     detectors_.push_back(detector_loader_.createSharedInstance(
       "apriltag_detector_" + detectors[i] + "::Detector"));
+    detector_types_.insert(detectors[i]);
   }
   const bool use_approx_sync =
     declare_parameter<bool>("use_approximate_sync", true);
