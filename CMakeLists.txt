@@ -140,7 +140,9 @@ target_compile_features(${PROJECT_NAME}_node PRIVATE cxx_std_17)
 #
 # -------- processing from bag
 #
-add_executable(${PROJECT_NAME}_from_bag src/${PROJECT_NAME}_from_bag.cpp)
+add_executable(${PROJECT_NAME}_from_bag
+  src/${PROJECT_NAME}_from_bag.cpp
+  src/enhanced_player.cpp)
 ament_target_dependencies(${PROJECT_NAME}_from_bag
   ${tagslam_ament_dependencies}
   rosbag2_transport)
@@ -170,7 +172,9 @@ rclcpp_components_register_nodes(sync_and_detect "${PROJECT_NAME}::SyncAndDetect
 # -------- sync-and-detect from bag
 #
 
-add_executable(sync_and_detect_from_bag src/sync_and_detect_from_bag.cpp)
+add_executable(sync_and_detect_from_bag
+  src/sync_and_detect_from_bag.cpp
+  src/enhanced_player.cpp)
 ament_target_dependencies(sync_and_detect_from_bag rosbag2_transport)
 target_link_libraries(sync_and_detect_from_bag sync_and_detect yaml-cpp)
 
