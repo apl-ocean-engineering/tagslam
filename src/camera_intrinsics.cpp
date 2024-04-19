@@ -57,6 +57,11 @@ CameraIntrinsics CameraIntrinsics::parse_no_error(const YAML::Node & config)
   ci.distortionModel_ = distMap[distModel];
   ci.distortionCoeffs_ =
     yaml::parse_container<std::vector<double>>(config, "distortion_coeffs");
+  if (
+    (distModel == "equidistant" || distModel == "fisheye") &&
+    ci.distortionCoeffs_.size() != 4) {
+    BOMB_OUT("this camera distortion model must have 4 coefficients!");
+  }
   ci.K_ = yaml::parse_container<std::vector<double>>(config, "intrinsics");
   ci.resolution_ =
     yaml::parse_container<std::vector<int>>(config, "resolution");
