@@ -42,7 +42,8 @@ bool EnhancedPlayer::hasImageTopics(
   bool all_there = true;
   const auto pubs = rosbag2_transport::Player::get_publishers();
   for (const auto & topic : topics) {
-    const auto image_topic = topic.first + "/" + topic.second;
+    const auto image_topic =
+      topic.first + (topic.second == "raw" ? "" : "/" + topic.second);
     if (pubs.find(image_topic) == pubs.end()) {
       LOG_WARN("topic " << image_topic << " is not in bag!");
       all_there = false;
