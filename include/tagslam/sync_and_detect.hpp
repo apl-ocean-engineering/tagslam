@@ -116,6 +116,7 @@ public:
   const svec & getOdomTopics() const { return (odom_topics_); }
   const svec & getSyncedOdomTopics() const { return (synced_odom_topics_); }
   const svec & getTagTopics() const { return (tag_topics_); }
+  const auto & getNumberOfFrames() const { return (num_frames_); }
 
 private:
   using ImageExactSync = flex_sync::LiveSync<flex_sync::ExactSync<Image>>;

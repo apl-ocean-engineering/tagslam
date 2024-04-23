@@ -88,7 +88,8 @@ int main(int argc, char ** argv)
     sync_node->declare_parameter<std::string>("out_bag", "");
 
   std::shared_ptr<rosbag2_transport::Recorder> recorder_node;
-
+  size_t num_frames =
+    sync_node->declare_parameter<int>("max_number_of_frames", 0);
   if (!out_uri.empty()) {
     LOG_INFO("writing detected tags to bag: " << out_uri);
     rclcpp::NodeOptions recorder_options;
@@ -106,6 +107,10 @@ int main(int argc, char ** argv)
 
   while (player_node->play_next() && rclcpp::ok()) {
     exec.spin_some();
+    if (num_frames && sync_node->getNumberOfFrames() > num_frames) {
+      LOG_INFO("reached max number of frames: " << num_frames);
+      break;
+    }
   }
   LOG_INFO("sync_and_detect finished!");
   rclcpp::shutdown();

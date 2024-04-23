@@ -30,7 +30,6 @@
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rosbag2_cpp/writer.hpp>
-#include <rosgraph_msgs/msg/clock.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <set>
 #include <std_msgs/msg/header.hpp>
@@ -71,7 +70,6 @@ class TagSLAM : public TagFactory, public rclcpp::Node
   using Point = apriltag_msgs::msg::Point;
   using Path = nav_msgs::msg::Path;
   using Header = std_msgs::msg::Header;
-  using Clock = rosgraph_msgs::msg::Clock;
 
   using ExactSync = flex_sync::ExactSync<TagArray, Odometry>;
   using ApproxSync = flex_sync::ApproximateSync<TagArray, Odometry>;
@@ -90,17 +88,12 @@ public:
   TagConstPtr findTag(int tagId) final;
 
   // ------ own methods
-  const std::vector<std::string> getTagTopics() const;
-  const std::vector<std::string> getOdomTopics() const;
-  const std::vector<std::string> getPublishedTopics() const;
-  const std::vector<std::pair<std::string, std::string>> getImageTopics() const;
-  bool initialize();
+  std::vector<std::string> getTagTopics() const;
+  std::vector<std::string> getOdomTopics() const;
+  std::vector<std::string> getPublishedTopics() const;
+  std::vector<std::pair<std::string, std::string>> getImageTopics() const;
+  size_t getNumberOfFrames() const { return (static_cast<size_t>(frameNum_)); }
   void finalize(bool optimize = true);
-  void subscribe();
-
-  void syncCallback(
-    const std::vector<TagArrayConstPtr> & msgvec1,
-    const std::vector<OdometryConstPtr> & msgvec3);
 
 private:
   struct ReMap
@@ -116,8 +109,12 @@ private:
   };
   typedef std::unordered_map<int, TagConstPtr> TagMap;
   // ---------- methods
+  bool initialize();
   TagPtr addTag(int tagId, const std::shared_ptr<Body> & body) const;
-
+  void subscribe();
+  void syncCallback(
+    const std::vector<TagArrayConstPtr> & msgvec1,
+    const std::vector<OdometryConstPtr> & msgvec3);
   void testForOldLaunchParameters();
   void readParams();
   void readBodies(const YAML::Node & config);
@@ -147,7 +144,6 @@ private:
 
   void publishTransforms(uint64_t t, bool orig = false);
   void publishBodyOdom(uint64_t t);
-  void sleep(double dt) const;
   void processTags(
     uint64_t t, const std::vector<TagArrayConstPtr> & tagMsgs,
     std::vector<VertexDesc> * factors);
@@ -187,7 +183,6 @@ private:
   {
     return (rclcpp::Time(t, this->get_clock()->get_clock_type()));
   }
-  bool runOnline() { return (true); }
   // ------ variables --------
 
   rclcpp::Node * node_{nullptr};
@@ -201,7 +196,6 @@ private:
   CameraVec cameras_;
   BodyVec bodies_;
   BodyVec nonstaticBodies_;
-  rclcpp::Publisher<Clock>::SharedPtr clockPub_;
   rclcpp::Publisher<Header>::SharedPtr ackPub_;
   std::vector<rclcpp::Publisher<Odometry>::SharedPtr> odomPub_;
   std::vector<rclcpp::Publisher<Path>::SharedPtr> pathPub_;

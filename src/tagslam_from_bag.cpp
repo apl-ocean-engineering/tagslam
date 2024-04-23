@@ -109,6 +109,8 @@ int main(int argc, char ** argv)
 
   const std::string out_uri =
     tagslam_node->declare_parameter<std::string>("out_bag", "");
+  size_t num_frames =
+    tagslam_node->get_parameter_or<int>("max_number_of_frames", 0);
 
   std::shared_ptr<rosbag2_transport::Recorder> recorder_node;
   if (!out_uri.empty()) {
@@ -128,8 +130,14 @@ int main(int argc, char ** argv)
 
   while (player_node->play_next() && rclcpp::ok()) {
     exec.spin_some();
+    if (tagslam_node->getNumberOfFrames() >= num_frames) {
+      break;
+    }
   }
-  tagslam_node->finalize();
+  if (tagslam_node->getNumberOfFrames() < num_frames) {
+    // only finalize if we have not reached max number of frames
+    tagslam_node->finalize();
+  }
   rclcpp::shutdown();
   return 0;
 }

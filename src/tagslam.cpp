@@ -34,7 +34,6 @@
 #include <rclcpp_components/register_node_macro.hpp>
 #include <rosbag2_cpp/reader.hpp>
 #include <rosbag2_cpp/readers/sequential_reader.hpp>
-#include <rosgraph_msgs/msg/clock.hpp>
 #include <sstream>
 #include <tagslam/body.hpp>
 #include <tagslam/body_defaults.hpp>
@@ -187,36 +186,45 @@ TagPtr TagSLAM::addTag(int tagId, const std::shared_ptr<Body> & body) const
   return (p);
 }
 
-void TagSLAM::sleep(double dt) const
-{
-  // XXX(Bernd) no sleeping yet.
-  (void)dt;
-}
-
 void TagSLAM::readParams()
 {
   outBagName_ = declare_parameter("outbag", "out.bag");
   playbackRate_ = declare_parameter("playback_rate", 5.0);
   outDir_ = declare_parameter("output_directory", ".");
   fixedFrame_ = declare_parameter<string>("fixed_frame_id", "map");
-  maxFrameNum_ = declare_parameter<int>("max_number_of_frames", 1000000);
+  maxFrameNum_ = declare_parameter<int>("max_number_of_frames", 0);
   publishAck_ = declare_parameter<bool>("publish_ack", false);
 }
 
 static YAML::Node readConfig(
-  rclcpp::Node * node, const std::string & param_name)
+  rclcpp::Node * node, const std::string & param_name,
+  bool can_be_empty = false)
 {
+  auto logger = node->get_logger();
   const std::string conf_file = node->declare_parameter<string>(param_name, "");
   if (conf_file.empty()) {
-    RCLCPP_ERROR_STREAM(
-      node->get_logger(),
-      param_name << " parameter must be set to valid filename!");
-    throw(std::runtime_error("param " + param_name + " not set"));
+    if (!can_be_empty) {
+      RCLCPP_ERROR_STREAM(
+        logger, param_name << " parameter must be set to valid filename!");
+      throw(std::runtime_error("param " + param_name + " not set"));
+    } else {
+      return (YAML::Node());
+    }
   }
-  YAML::Node config = YAML::LoadFile(conf_file);
-  if (config.IsNull()) {
+  YAML::Node config;
+  try {
+    config = YAML::LoadFile(conf_file);
+  } catch (const YAML::ParserException & e) {
     RCLCPP_ERROR_STREAM(
-      node->get_logger(), "cannot open config file: " << conf_file);
+      logger, "error parsing file: " << conf_file << ": " << e.what());
+    throw(std::runtime_error("error parsing file: " + conf_file));
+  } catch (const YAML::BadFile & e) {
+    RCLCPP_ERROR_STREAM(
+      logger, "bad or non-existent file: " << conf_file << ": " << e.what());
+    throw(std::runtime_error("bad file: " + conf_file));
+  }
+  if (config.IsNull()) {
+    RCLCPP_ERROR_STREAM(logger, "cannot open config file: " << conf_file);
     throw(std::runtime_error("cannot open config file " + conf_file));
   }
   return (config);
@@ -240,19 +248,13 @@ bool TagSLAM::initialize()
   readCameras(readConfig(node_, "cameras"));
   readSquash(config);
   readRemap(config);
-  readCameraPoses(readConfig(node_, "camera_poses"));
+  readCameraPoses(readConfig(node_, "camera_poses", true));
   measurements_ = measurements::read_all(config, this);
   // apply measurements
   for (auto & m : measurements_) {
     m->addToGraph(graph_);
     m->tryAddToOptimizer(graph_);
   }
-  /*
-  XXX(Bernd) deal with this later
-  if (!runOnline()) {
-    clockPub_ = nh_.advertise<rosgraph_msgs::Clock>("/clock", QSZ);
-  }
-  */
   replayService_ = node_->create_service<Trigger>(
     "replay",
     std::bind(
@@ -502,7 +504,7 @@ void TagSLAM::readCameras(const YAML::Node & config)
   }
 }
 
-const std::vector<std::string> TagSLAM::getTagTopics() const
+std::vector<std::string> TagSLAM::getTagTopics() const
 {
   std::vector<std::string> tagTopics;
   for (const auto & c : cameras_) {
@@ -511,8 +513,7 @@ const std::vector<std::string> TagSLAM::getTagTopics() const
   return (tagTopics);
 }
 
-const std::vector<std::pair<std::string, std::string>> TagSLAM::getImageTopics()
-  const
+std::vector<std::pair<std::string, std::string>> TagSLAM::getImageTopics() const
 {
   std::vector<std::pair<std::string, std::string>> imageTopics;
   for (const auto & c : cameras_) {
@@ -521,7 +522,7 @@ const std::vector<std::pair<std::string, std::string>> TagSLAM::getImageTopics()
   return (imageTopics);
 }
 
-const std::vector<std::string> TagSLAM::getOdomTopics() const
+std::vector<std::string> TagSLAM::getOdomTopics() const
 {
   std::vector<std::string> odomTopics;
   for (const auto & body : bodies_) {
@@ -532,7 +533,7 @@ const std::vector<std::string> TagSLAM::getOdomTopics() const
   return (odomTopics);
 }
 
-const std::vector<std::string> TagSLAM::getPublishedTopics() const
+std::vector<std::string> TagSLAM::getPublishedTopics() const
 {
   std::vector<std::string> pubTopics;
   for (const auto & body : bodies_) {
@@ -847,7 +848,7 @@ void TagSLAM::processTagsAndOdom(
     ackPub_->publish(header);
   }
   profiler_.record("publish");
-  if (runOnline() && frameNum_ >= maxFrameNum_) {
+  if (maxFrameNum_ && frameNum_ >= maxFrameNum_) {
     if (publishAck_) {
       auto h = header;
       h.frame_id = "FINISHED!";
@@ -855,18 +856,12 @@ void TagSLAM::processTagsAndOdom(
     }
     LOG_INFO("reached max number of frames, finished!");
     finalize(true);
-    // ros::shutdown();
   }
 }
 
 void TagSLAM::publishAll(const uint64_t t)
 {
   publishBodyOdom(t);
-  if (!runOnline() && !writeToBag_) {
-    rosgraph_msgs::msg::Clock clockMsg;
-    clockMsg.clock = rosTime(t);
-    clockPub_->publish(clockMsg);
-  }
   publishTransforms(t, false);
 }
 
