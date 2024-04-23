@@ -23,7 +23,7 @@ EnhancedPlayer::EnhancedPlayer(
 : rosbag2_transport::Player(name, opt)
 {
 }
-bool EnhancedPlayer::hasAllTopics(const std::vector<std::string> & topics)
+bool EnhancedPlayer::hasTopics(const std::vector<std::string> & topics)
 {
   bool all_there = true;
   const auto pubs = rosbag2_transport::Player::get_publishers();
@@ -35,4 +35,20 @@ bool EnhancedPlayer::hasAllTopics(const std::vector<std::string> & topics)
   }
   return (all_there);
 }
+
+bool EnhancedPlayer::hasImageTopics(
+  const std::vector<std::pair<std::string, std::string>> & topics)
+{
+  bool all_there = true;
+  const auto pubs = rosbag2_transport::Player::get_publishers();
+  for (const auto & topic : topics) {
+    const auto image_topic = topic.first + "/" + topic.second;
+    if (pubs.find(image_topic) == pubs.end()) {
+      LOG_WARN("topic " << image_topic << " is not in bag!");
+      all_there = false;
+    }
+  }
+  return (all_there);
+}
+
 }  // namespace tagslam

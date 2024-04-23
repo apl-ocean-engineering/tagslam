@@ -17,6 +17,7 @@
 #define TAGSLAM__ENHANCED_PLAYER_HPP_
 
 #include <rosbag2_transport/player.hpp>
+#include <utility>
 
 namespace tagslam
 {
@@ -25,7 +26,9 @@ class EnhancedPlayer : public rosbag2_transport::Player
 public:
   EnhancedPlayer(const std::string & name, const rclcpp::NodeOptions & opt);
 
-  bool hasAllTopics(const std::vector<std::string> & topics);
+  bool hasTopics(const std::vector<std::string> & topics);
+  bool hasImageTopics(
+    const std::vector<std::pair<std::string, std::string>> & topics);
 };
 
 }  // namespace tagslam

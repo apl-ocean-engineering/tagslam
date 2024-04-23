@@ -93,6 +93,7 @@ public:
   const std::vector<std::string> getTagTopics() const;
   const std::vector<std::string> getOdomTopics() const;
   const std::vector<std::string> getPublishedTopics() const;
+  const std::vector<std::pair<std::string, std::string>> getImageTopics() const;
   bool initialize();
   void finalize(bool optimize = true);
   void subscribe();

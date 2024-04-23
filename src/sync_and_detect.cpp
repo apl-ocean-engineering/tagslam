@@ -65,7 +65,7 @@ SyncAndDetect::SyncAndDetect(const rclcpp::NodeOptions & opt)
     pub_ = std::make_shared<Publisher>(this, tag_topics_, synced_odom_topics_);
     listener_ = pub_;
   }
-  subscribe({image_topics_, odom_topics_}, transports_, detector_names_);
+  subscribe(image_topics_, odom_topics_, detector_names_);
 }
 
 SyncAndDetect::~SyncAndDetect()
@@ -114,15 +114,16 @@ void SyncAndDetect::parseCameras(const YAML::Node & conf)
     if (!c["image_topic"] || !c["tag_topic"]) {
       BOMB_OUT("must specify image_topic and tag_topic for camera " << cam);
     }
-    image_topics_.push_back(c["image_topic"].as<string>());
     tag_topics_.push_back(c["tag_topic"].as<string>());
-    transports_.push_back(
-      c["image_transport"] ? c["image_transport"].as<string>() : "raw");
+    image_topics_.push_back(
+      {c["image_topic"].as<string>(),
+       c["image_transport"] ? c["image_transport"].as<string>() : "raw"});
     detector_names_.push_back(
       c["tag_detector"] ? c["tag_detector"].as<string>() : "umich");
     LOG_INFO(
-      "camera " << cam << " topic: " << image_topics_.back() << " transp: "
-                << transports_.back() << " detect: " << detector_names_.back());
+      "camera " << cam << " topic: " << image_topics_.back().first
+                << " transp: " << image_topics_.back().second
+                << " detect: " << detector_names_.back());
   }
 }
 
@@ -190,17 +191,18 @@ size_t SyncAndDetect::getNumberOfTagsDetected() const
   return (num_tags_detected_);
 }
 void SyncAndDetect::subscribe(
-  const std::vector<svec> & topics, const svec & transports,
-  const svec & detectors)
+  const std::vector<std::pair<std::string, std::string>> & img_topics,
+  const svec & odom_topics, const svec & detectors)
 {
-  assert(topics.size() == 1 || topics.size() == 2);
-  const auto & imgs = topics[0];
-  assert(imgs.size() == transports.size());
-  assert(imgs.size() == detectors.size());
+  svec imgs;
+  for (const auto & img : img_topics) {
+    imgs.push_back(img.first);
+  }
+  assert(img_topics.size() == detectors.size());
 
-  for (size_t i = 0; i < imgs.size(); i++) {
-    const auto & topic = imgs[i];
-    declare_parameter<string>(topic + ".image_transport", transports[i]);
+  for (size_t i = 0; i < img_topics.size(); i++) {
+    const auto & topic = img_topics[i].first;
+    declare_parameter<string>(topic + ".image_transport", img_topics[i].second);
     detectors_.push_back(detector_loader_.createSharedInstance(
       "apriltag_detector_" + detectors[i] + "::Detector"));
     detector_types_.insert(detectors[i]);
@@ -209,21 +211,25 @@ void SyncAndDetect::subscribe(
     declare_parameter<bool>("use_approximate_sync", true);
   LOG_INFO("using approximate sync: " << (use_approx_sync ? "YES" : "NO"));
   const int qs = 10;  // queue size
-  if (topics.size() == 1) {
+  if (odom_topics.empty()) {
     if (use_approx_sync) {
       image_approx_sync_ = std::make_shared<ImageApproxSync>(
-        this, topics, std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
+        this, svecvec({imgs}),
+        std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
     } else {
       image_exact_sync_ = std::make_shared<ImageExactSync>(
-        this, topics, std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
+        this, svecvec({imgs}),
+        std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
     }
   } else {
     if (use_approx_sync) {
       image_odom_approx_sync_ = std::make_shared<ImageAndOdomApproxSync>(
-        this, topics, std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
+        this, svecvec({imgs, odom_topics}),
+        std::bind(&SyncAndDetect::callbackImageAndOdom, this, _1, _2), qs);
     } else {
       image_odom_exact_sync_ = std::make_shared<ImageAndOdomExactSync>(
-        this, topics, std::bind(&SyncAndDetect::callbackImage, this, _1), qs);
+        this, svecvec({imgs, odom_topics}),
+        std::bind(&SyncAndDetect::callbackImageAndOdom, this, _1, _2), qs);
     }
   }
 }

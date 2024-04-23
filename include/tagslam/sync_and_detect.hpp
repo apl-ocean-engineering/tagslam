@@ -69,6 +69,7 @@ private:
 namespace tagslam
 {
 using svec = std::vector<std::string>;
+using svecvec = std::vector<std::vector<std::string>>;
 using Image = sensor_msgs::msg::Image;
 using VecImagePtr = std::vector<Image::ConstSharedPtr>;
 using ApriltagArray = apriltag_msgs::msg::AprilTagDetectionArray;
@@ -107,7 +108,11 @@ public:
   explicit SyncAndDetect(const rclcpp::NodeOptions & opt);
   ~SyncAndDetect();
   void setListener(const std::shared_ptr<SyncAndDetectListener> & m);
-  const svec & getImageTopics() const { return (image_topics_); }
+  const std::vector<std::pair<std::string, std::string>> & getImageTopics()
+    const
+  {
+    return (image_topics_);
+  }
   const svec & getOdomTopics() const { return (odom_topics_); }
   const svec & getSyncedOdomTopics() const { return (synced_odom_topics_); }
   const svec & getTagTopics() const { return (tag_topics_); }
@@ -132,8 +137,9 @@ private:
   size_t getNumberOfTagsDetected() const;
 
   void subscribe(
-    const std::vector<svec> & topics, const svec & transports,
-    const svec & detectors);
+    const std::vector<std::pair<std::string, std::string>> & img_topics,
+    const svec & odom_topics, const svec & detectors);
+
   size_t tagsFromImages(
     const VecImagePtr & imgs, VecApriltagArrayPtr * tagMsgs);
 
@@ -144,9 +150,8 @@ private:
   size_t num_frames_{0};
   svec odom_topics_;
   svec synced_odom_topics_;
-  svec image_topics_;
+  std::vector<std::pair<std::string, std::string>> image_topics_;
   svec tag_topics_;
-  svec transports_;
   svec detector_names_;
   std::set<std::string> detector_types_;
   std::shared_ptr<SyncAndDetectListener> listener_;

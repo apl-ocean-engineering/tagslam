@@ -511,6 +511,16 @@ const std::vector<std::string> TagSLAM::getTagTopics() const
   return (tagTopics);
 }
 
+const std::vector<std::pair<std::string, std::string>> TagSLAM::getImageTopics()
+  const
+{
+  std::vector<std::pair<std::string, std::string>> imageTopics;
+  for (const auto & c : cameras_) {
+    imageTopics.push_back({c->getImageTopic(), c->getImageTransport()});
+  }
+  return (imageTopics);
+}
+
 const std::vector<std::string> TagSLAM::getOdomTopics() const
 {
   std::vector<std::string> odomTopics;

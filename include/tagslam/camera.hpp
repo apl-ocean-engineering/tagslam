@@ -39,6 +39,7 @@ public:
   // --- getters/setters
   const string & getName() const { return (name_); }
   const string & getImageTopic() const { return (imageTopic_); }
+  const string & getImageTransport() const { return (imageTransport_); }
   const string & getTagTopic() const { return (tagTopic_); }
   const string & getFrameId() const { return (frameId_); }
   const string & getRigName() const { return (rigName_); }
@@ -56,13 +57,14 @@ private:
   // -------- variables -------
   string name_;
   int index_{-1};
-  string imageTopic_;            // topic for images
-  string tagTopic_;              // topic for tags
-  string frameId_;               // ros frame id of camera
-  string rigName_;               // name of rig body
-  std::shared_ptr<Body> rig_;    // pointer to rig body
-  CameraIntrinsics intrinsics_;  // intrinsic calibration
-  PoseNoise wiggle_;             // how rigid the ext calib is
+  string imageTopic_;             // topic for images
+  string imageTransport_{"raw"};  // image transport
+  string tagTopic_;               // topic for tags
+  string frameId_;                // ros frame id of camera
+  string rigName_;                // name of rig body
+  std::shared_ptr<Body> rig_;     // pointer to rig body
+  CameraIntrinsics intrinsics_;   // intrinsic calibration
+  PoseNoise wiggle_;              // how rigid the ext calib is
 };
 
 using CameraPtr = Camera::CameraPtr;

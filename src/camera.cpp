@@ -29,6 +29,9 @@ CameraPtr Camera::parse_camera(const string & name, const YAML::Node & config)
   cam.name_ = name;
   cam.intrinsics_ = CameraIntrinsics::parse(config);
   cam.imageTopic_ = yaml::parse<string>(config, "image_topic");
+  if (config["image_transport"]) {
+    cam.imageTransport_ = yaml::parse<string>(config, "image_transport");
+  }
   cam.tagTopic_ = yaml::parse<string>(config, "tag_topic", "");
   cam.rigName_ = yaml::parse<string>(config, "rig_body");
   cam.frameId_ = yaml::parse<string>(config, "frame_id", cam.name_);

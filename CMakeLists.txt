@@ -138,19 +138,6 @@ target_include_directories(${PROJECT_NAME}_node PRIVATE include)
 target_compile_features(${PROJECT_NAME}_node PRIVATE cxx_std_17)
 
 #
-# -------- processing from bag
-#
-add_executable(${PROJECT_NAME}_from_bag
-  src/${PROJECT_NAME}_from_bag.cpp
-  src/enhanced_player.cpp)
-ament_target_dependencies(${PROJECT_NAME}_from_bag
-  ${tagslam_ament_dependencies}
-  rosbag2_transport)
-target_link_libraries(${PROJECT_NAME}_from_bag ${PROJECT_NAME})
-target_include_directories(${PROJECT_NAME}_from_bag PRIVATE include)
-target_compile_features(${PROJECT_NAME}_from_bag PRIVATE cxx_std_17)
-
-#
 # -------- sync-and-detect shared library
 #
 add_library(sync_and_detect SHARED
@@ -167,6 +154,19 @@ target_include_directories(
     $<INSTALL_INTERFACE:include>)
 
 rclcpp_components_register_nodes(sync_and_detect "${PROJECT_NAME}::SyncAndDetect")
+
+#
+# -------- processing from bag
+#
+add_executable(${PROJECT_NAME}_from_bag
+  src/${PROJECT_NAME}_from_bag.cpp
+  src/enhanced_player.cpp)
+ament_target_dependencies(${PROJECT_NAME}_from_bag
+  ${tagslam_ament_dependencies}
+  rosbag2_transport)
+target_link_libraries(${PROJECT_NAME}_from_bag ${PROJECT_NAME} sync_and_detect)
+target_include_directories(${PROJECT_NAME}_from_bag PRIVATE include)
+target_compile_features(${PROJECT_NAME}_from_bag PRIVATE cxx_std_17)
 
 #
 # -------- sync-and-detect from bag
