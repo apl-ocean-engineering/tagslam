@@ -10,7 +10,22 @@ ROS2 is WORK IN PROGRESS. Documentation will follow.
 At the moment TagSLAM requires ROS2 Rolling/Jazzy or newer.
 Older versions of ROS2 lack some important rosbag2 features.
 
+## How to build
+
+The build instructions follow the standard procedure for ROS2. Set the following shell variables:
+
+```bash
+repo=tagslam
+url=https://github.com/berndpfrommer/${repo}.git
+```
+
+and follow the ROS2 build instructions [here](https://github.com/ros-misc-utilities/.github/blob/master/docs/build_ros_repository.md)
+
+Make sure to source your workspace's ``install/setup.bash`` afterwards.
+
+
 ## How to use
+
 
 ### Sync and detect
 
