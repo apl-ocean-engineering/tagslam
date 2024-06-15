@@ -11,11 +11,13 @@
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
   <depend>apriltag_msgs</depend>
-  <depend>flex_sync</depend>
+  <depend>boost</depend>
   <depend>cv_bridge</depend>
+  <depend>flex_sync</depend>
   <depend>gtsam</depend>
   <depend>image_transport</depend>
   <depend>nav_msgs</depend>
+  <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>rosgraph_msgs</depend>
@@ -24,8 +26,7 @@
   <depend>tf2_msgs</depend>
   <depend>tf2</depend>
   <depend>yaml-cpp</depend>
-  <depend>pluginlib</depend>
-
+    
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
