@@ -72,7 +72,7 @@ ros2 run tagslam tagslam_node --ros-args -p "cameras:=./blue_rov/cameras.yaml" -
 
 
 ### 
-ros2 bag play --pause --start-offset 10 -r 0.25 rosbag2_2024_07_19-14_27_40
+ros2 bag play -p --start-offset 10 -r 1.0 rosbag2_2024_07_19-14_27_40
 
 ros2 run tagslam sync_and_detect_node --ros-args -p "cameras:=./blue_rov/cameras.yaml" -p "tagslam_config:=./blue_rov/tagslam.yaml"
 
