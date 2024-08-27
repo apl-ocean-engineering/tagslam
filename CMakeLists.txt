@@ -218,7 +218,8 @@ install(PROGRAMS
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}/
-  FILES_MATCHING PATTERN "*.py")
+  FILES_MATCHING PATTERN "*.xml"
+  )
 
 if(BUILD_TESTING)
   find_package(ament_cmake REQUIRED)

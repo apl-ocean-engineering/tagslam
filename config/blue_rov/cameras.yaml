@@ -1,0 +1,11 @@
+cam0:
+  camera_model: pinhole
+  intrinsics: [2899.0204445278514, 2686.823629123272, 986.5005638513198, 435.03108213647835]
+  distortion_model: plumb_bob
+  distortion_coeffs: [-0.14400812036907845,   1.424546376523864, 0.01295132172264049, -0.07433655106321685, -2.27330543014418]
+  resolution: [1920, 1080]
+  image_topic: /camera/image
+  tag_topic: /cam_sync/cam_0/detector/tags
+  tag_detector: umich
+  rig_body: rig
+

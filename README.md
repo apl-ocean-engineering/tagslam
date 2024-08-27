@@ -52,9 +52,34 @@ image topics, but no tag topics in the rosbag, and will start ``sync_and_detect`
 
 Run TagSLAM from a rosbag like this:
 ```
-ros2 run tagslam tagslam_from_bag --ros-args -p "cameras:=./cameras.yaml" -p "tagslam_config:=./tagslam.yaml" -p "camera_poses:=./camera_poses.yaml" -p "in_bag:=./bag_with_tags_and_odom" -p "out_bag:=./out_bag"
+ros2 run tagslam tagslam_from_bag --ros-args -p "cameras:=./cameras.yaml" -p "tagslam_config:=./tagslam.yaml" -p "camera_poses:=./camera_poses.yaml" -p "in_bag:=/home/mmicatka/Documents/dvc_data/2024_bluerov_data/2024-07-19-osb/bags/slam/rosbag2_2024_07_19-14_27_40" -p "out_bag:=/home/mmicatka/Documents/dvc_data/2024_bluerov_data/2024-07-19-osb/bags/slam/out"
 ```
 
+### Marc Notes:
+currently working: 
+
+**Sync and Detect**
+
+ros2 run tagslam sync_and_detect_node --ros-args -p "cameras:=/home/mmicatka/blue_rov_ws/src/tagslam/config/blue_rov/cameras.yaml" -p "tagslam_config:=/home/mmicatka/blue_rov_ws/src/tagslam/config/blue_rov/tagslam.yaml" 
+
+
+ros2 run tagslam sync_and_detect_from_bag --ros-args -p "cameras:=/home/mmicatka/blue_rov_ws/src/tagslam/config/blue_rov/cameras.yaml" -p "tagslam_config:=/home/mmicatka/blue_rov_ws/src/tagslam/config/blue_rov/tagslam.yaml" -p "in_bag:=/home/mmicatka/Documents/dvc_data/2024_bluerov_data/2024-07-19-osb/bags/slam/rosbag2_2024_07_19-14_27_40" -p "out_bag:=/home/mmicatka/Documents/dvc_data/2024_bluerov_data/2024-07-19-osb/bags/slam/out"
+
+**Sync and Detect**
+ros2 run tagslam tagslam_from_bag --ros-args -p "cameras:=/home/mmicatka/blue_rov_ws/src/tagslam/config/blue_rov/cameras.yaml" -p "tagslam_config:=/home/mmicatka/blue_rov_ws/src/tagslam/config/blue_rov/tagslam.yaml" -p "camera_poses:=/home/mmicatka/blue_rov_ws/src/tagslam/config/blue_rov/camera_poses.yaml" -p "in_bag:=/home/mmicatka/Documents/dvc_data/2024_bluerov_data/2024-07-19-osb/bags/slam/out" -p "out_bag:=/home/mmicatka/Documents/dvc_data/2024_bluerov_data/2024-07-19-osb/bags/slam/out2"
+
+ros2 run tagslam tagslam_node --ros-args -p "cameras:=./blue_rov/cameras.yaml" -p "tagslam_config:=./blue_rov/tagslam.yaml" -p "camera_poses:=./blue_rov/camera_poses.yaml" 
+
+
+### 
+ros2 bag play --pause --start-offset 10 -r 0.25 rosbag2_2024_07_19-14_27_40
+
+ros2 run tagslam sync_and_detect_node --ros-args -p "cameras:=./blue_rov/cameras.yaml" -p "tagslam_config:=./blue_rov/tagslam.yaml"
+
+ros2 run tagslam tagslam_node --ros-args -p "cameras:=./blue_rov/cameras.yaml" -p "tagslam_config:=./blue_rov/tagslam.yaml" -p "camera_poses:=./blue_rov/camera_poses.yaml" 
+
+^ Seems you need to specify a pose for at least 1 tag (maybe more?)
+Unclear if you need to pass which tags are in the library to the tagslam.yaml file.
 
 ## License
 
