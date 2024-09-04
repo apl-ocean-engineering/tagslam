@@ -75,7 +75,11 @@ Plane::PlaneMeasurementsPtr Plane::read(
     BOMB_OUT("plane measurements must be valid array!");
   }
   LOG_INFO("found " << meas.size() << " plane measurement(s)!");
+  // const std::string name = meas[0][0].Tag();
+  // LOG_INFO("found plane measurement: " << name);
+
   for (size_t i = 0; i < meas.size(); i++) {  // iterate over planes
+
     try {
       if (!meas[i].IsMap()) {
         BOMB_OUT("plane " << i << " is not struct!");
@@ -83,8 +87,13 @@ Plane::PlaneMeasurementsPtr Plane::read(
       if (meas[i].size() != 1) {
         BOMB_OUT("plane " << i << " has wrong number of fields");
       }
-      const std::string name = meas[i][0].Tag();
-      const auto plane = meas[i][0];
+      // Extract the plane name and data
+      auto planeIt = meas[i].begin();
+      std::string name = planeIt->first.as<std::string>();
+      YAML::Node plane = planeIt->second;
+      // const std::string name = meas[i].begin()->first;
+      // const std::string name = meas[i][0].Tag();
+      // const auto plane = meas[i][0];
       const std::vector<int> tags =
         yaml::parse_container<std::vector<int>>(plane, "tags");
       const double d = yaml::parse<double>(plane, "distance");
