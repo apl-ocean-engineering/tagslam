@@ -60,7 +60,8 @@ int main(int argc, char ** argv)
   exec.add_node(tagslam_node);
 
   const auto recorded_topics = tagslam_node->getPublishedTopics();
-  printTopics("recorded topic", recorded_topics);
+  printTopics("recorded topics", recorded_topics);
+
 
   const std::string in_uri =
     tagslam_node->declare_parameter<std::string>("in_bag", "");
@@ -72,13 +73,14 @@ int main(int argc, char ** argv)
   if (!std::filesystem::exists(in_uri)) {
     LOG_ERROR("cannot find input bag: " << in_uri);
   }
-  rclcpp::NodeOptions player_options;
-  using Parameter = rclcpp::Parameter;
+
   const auto images = tagslam_node->getImageTopics();
   const auto tags = tagslam_node->getTagTopics();
   const auto odoms = tagslam_node->getOdomTopics();
-  // const auto in_topics = merge({images, tags, odoms});
-  // printTopics("taglslam input topics", in_topics);
+  printTopics("input tags", tags);
+
+  rclcpp::NodeOptions player_options;
+  using Parameter = rclcpp::Parameter;
 
   player_options.parameter_overrides(
     {Parameter("storage.uri", in_uri),  // Parameter("play.topics", in_topics),
@@ -87,7 +89,7 @@ int main(int argc, char ** argv)
      Parameter("play.disable_keyboard_controls", true)});
   auto player_node =
     std::make_shared<tagslam::EnhancedPlayer>("rosbag_player", player_options);
-  player_node->get_logger().set_level(rclcpp::Logger::Level::Warn);
+  // player_node->get_logger().set_level(rclcpp::Logger::Level::Warn);
   exec.add_node(player_node);
 
   std::shared_ptr<tagslam::SyncAndDetect> sync_node;
@@ -103,6 +105,7 @@ int main(int argc, char ** argv)
       exec.add_node(sync_node);
     }
   }
+
   if (!odoms.empty() && !player_node->hasTopics(odoms)) {
     LOG_ERROR("odom topics not in bag, tagslam may hang!");
   }
@@ -111,6 +114,7 @@ int main(int argc, char ** argv)
     tagslam_node->declare_parameter<std::string>("out_bag", "");
   size_t num_frames =
     tagslam_node->get_parameter_or<int>("max_number_of_frames", 0);
+    LOG_INFO("Max Frames: " << num_frames);
 
   std::shared_ptr<rosbag2_transport::Recorder> recorder_node;
   if (!out_uri.empty()) {
@@ -131,6 +135,7 @@ int main(int argc, char ** argv)
   while (player_node->play_next() && rclcpp::ok()) {
     exec.spin_some();
     if (tagslam_node->getNumberOfFrames() >= num_frames) {
+      LOG_INFO("Quitting!");
       break;
     }
   }

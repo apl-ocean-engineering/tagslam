@@ -31,6 +31,8 @@ bool EnhancedPlayer::hasTopics(const std::vector<std::string> & topics)
     if (pubs.find(topic) == pubs.end()) {
       LOG_ERROR("topic " << topic << " is not in bag!");
       all_there = false;
+    } else {
+      LOG_INFO("topic " << topic << " is in bag!");
     }
   }
   return (all_there);
