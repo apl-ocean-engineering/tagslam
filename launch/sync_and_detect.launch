@@ -1,10 +1,11 @@
 <launch>
   <arg name="output" default="screen"/>
+  <!-- <arg name="bag" default="/home/mmicatka/Documents/dvc_data/trisect_data/2025-01-16_tank_testing/trisect1/2025-01-16-14-36-29.bag"/> -->
   <arg name="bag" default=""/>
   <arg name="detector_type" default="Mit"/>
   <arg name="start_time" default="0.0"/>
   <arg name="duration" default="-1.0"/>
-  <arg name="images_are_compressed" default="true"/>
+  <arg name="images_are_compressed" default="false"/>
   <arg name="use_approximate_sync" default="false"/>
   <arg name="annotate_images" default="true"/>
   <!-- for list of valid tag families, see apriltag_detector.h
@@ -16,7 +17,7 @@
   <node pkg="tagslam" type="sync_and_detect_node" name="sync_and_detect"
     output="$(arg output)" clear_params="True">
     <rosparam param="image_topics">
-      ["/pg_17274483/image_raw/compressed"]
+      ["/trisect/left/image_raw"]
     </rosparam>
     <rosparam param="image_output_topics">
       ["/annotated_images/compressed"]
