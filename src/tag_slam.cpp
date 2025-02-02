@@ -22,7 +22,7 @@
 #include <XmlRpcException.h>
 
 #include <boost/range/irange.hpp>
-
+#include <filesystem>
 #include <sstream>
 #include <iomanip>
 #include <cmath>
@@ -84,7 +84,7 @@ namespace tagslam {
       o << " " << FMT(7, 3) << v(i);
     }
   }
-  
+
   static double find_size_of_tag(const geometry_msgs::Point *imgCorn) {
     Eigen::Matrix<double, 4, 2> x;
     x << imgCorn[0].x, imgCorn[0].y, imgCorn[1].x, imgCorn[1].y,
@@ -101,7 +101,7 @@ namespace tagslam {
     {"slow", SLOW},
     {"fast", FAST}
   };
- 
+
   TagSlam::TagSlam(const ros::NodeHandle &nh) : nh_(nh) {
     initialGraph_.reset(new Graph());
     // Alias the graph to the initial graph. That way during startup,
@@ -130,7 +130,20 @@ namespace tagslam {
     nh_.param<bool>("write_debug_images", writeDebugImages_, false);
     nh_.param<bool>("publish_ack", publishAck_, false);
     nh_.param<bool>("has_compressed_images", hasCompressedImages_, false);
-  }
+
+  // Check if output_directory exists, create it if not
+    if (!std::filesystem::exists(outDir_)) {
+        if (std::filesystem::create_directories(outDir_)) {
+            ROS_INFO_STREAM("Created output directory: " << outDir_);
+        } else {
+            ROS_ERROR_STREAM("Failed to create output directory: " << outDir_);
+            throw std::runtime_error("Output directory creation failed");
+        }
+    }
+
+    std::string filePath = outDir_ + "/camera_poses.yaml";
+    ROS_INFO_STREAM("Camera poses will be saved to: " << filePath);
+}
 
   void TagSlam::testForOldLaunchParameters() {
     std::vector<string> oldParams =
@@ -258,13 +271,14 @@ namespace tagslam {
     publishTransforms(times_.empty() ? ros::Time(0) :
                       *(times_.rbegin()) + ros::Duration(0.001), true);
     tagCornerFile_.flush();
-    
+
     outBag_.open(outBagName_, rosbag::bagmode::Write);
     writeToBag_ = true;
     doReplay(0 /* playback at full speed */);
     writeToBag_ = false;
     outBag_.close();
-
+    std::string filePath = outDir_ + "/camera_poses.yaml";
+    ROS_INFO_STREAM("Camera poses will be saved to: " << filePath.c_str());
     writeCameraPoses(outDir_ + "/camera_poses.yaml");
     writeFullCalibration(outDir_ + "/calibration.yaml");
     profiler_.reset("writePoses");
@@ -318,7 +332,7 @@ namespace tagslam {
         nonstaticBodies_.push_back(body);
         odomPub_.push_back(
           nh_.advertise<nav_msgs::Odometry>("odom/body_"+body->getName(),QSZ));
-        
+
         trajectoryPub_.push_back(nh_.advertise<nav_msgs::Path>("path/body_"+body->getName(),QSZ));
         trajectory_.push_back(nav_msgs::Path());
       }
@@ -457,7 +471,7 @@ namespace tagslam {
     ROS_INFO_STREAM("finished dumping.");
     return (true);
   }
- 
+
   bool TagSlam::replay(std_srvs::Trigger::Request& req,
                        std_srvs::Trigger::Response &res) {
     ROS_INFO_STREAM("replaying!");
@@ -467,7 +481,7 @@ namespace tagslam {
     ROS_INFO_STREAM("finished replaying " << times_.size() << " frames");
     return (true);
   }
-  
+
   bool TagSlam::dump(std_srvs::Trigger::Request& req,
                      std_srvs::Trigger::Response &res) {
     ROS_INFO_STREAM("dumping!");
@@ -644,7 +658,7 @@ namespace tagslam {
     processTagsAndOdom(msgvec1, msgvec3);
     profiler_.record("processTagsAndOdom");
   }
-  
+
   void TagSlam::syncCallbackCompressed(
     const std::vector<TagArrayConstPtr> &msgvec1,
     const std::vector<CompressedImageConstPtr> &msgvec2,
@@ -851,7 +865,7 @@ namespace tagslam {
     }
   }
 
-  
+
   void TagSlam::setupOdom(const std::vector<OdometryConstPtr> &odomMsgs) {
     std::set<BodyConstPtr> bodySet;
     for (const auto odomIdx: irange(0ul, odomMsgs.size())) {
@@ -903,7 +917,7 @@ namespace tagslam {
     graph_utils::add_tag(graph_.get(), *p);
     return (p);
   }
-  
+
   TagConstPtr TagSlam::findTag(int tagId) {
     TagMap::iterator it = tagMap_.find(tagId);
     TagPtr p;
@@ -924,7 +938,7 @@ namespace tagslam {
     }
     return (it->second);
   }
-  
+
   void TagSlam::writeCameraPoses(const string &fname) {
     std::ofstream f(fname);
     for (const auto &cam : cameras_) {
@@ -1071,7 +1085,7 @@ namespace tagslam {
       }
     }
   }
-  
+
   std::vector<TagConstPtr>
   TagSlam::findTags(const std::vector<Apriltag> &ta) {
     std::vector<TagConstPtr> tpv;
@@ -1180,7 +1194,7 @@ namespace tagslam {
           }
         }
       }
-      // remap 
+      // remap
       for (auto &tag: p->apriltags) {
         auto it = tagRemap_.find(tag.id);
         if (it != tagRemap_.end()) {
@@ -1292,7 +1306,7 @@ namespace tagslam {
       }
     }
   }
-  
+
   void
   TagSlam::writeTagCorners(const ros::Time &t, int camIdx,
                             const TagConstPtr &tag,
