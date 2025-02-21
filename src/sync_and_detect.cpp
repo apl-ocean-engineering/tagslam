@@ -57,12 +57,17 @@ bool SyncAndDetect::initialize() {
   nh_.param<std::string>("detector_type", detectorType_, "Mit");
   int borderWidth;
   nh_.param<int>("black_border_width", borderWidth, 1);
+
+  int nThreads;
+  nh_.param<int>("detector_nthreads", nThreads, 1);
   for (const auto &i : irange(0ul, imageTopics_.size())) {
     (void)i;
-    if (detectorType_ == "Mit") {
+    if (strncasecmp(detectorType_.c_str(), "Mit",3)==0) {
+      ROS_INFO_STREAM("Using MIT detector");
       detectors_.push_back(apriltag_ros::ApriltagDetector::Create(
           apriltag_ros::DetectorType::Mit, tagFamily));
-    } else if (detectorType_ == "Umich") {
+    } else if (strncasecmp(detectorType_.c_str(),"Umich",5)==0) {
+      ROS_INFO_STREAM("Using UMich detector");
       detectors_.push_back(apriltag_ros::ApriltagDetector::Create(
           apriltag_ros::DetectorType::Umich, tagFamily));
       const int decim = nh_.param<int>("decimate", 1);
@@ -73,6 +78,10 @@ bool SyncAndDetect::initialize() {
       BOMB_OUT("INVALID DETECTOR TYPE: " << detectorType_);
     }
     detectors_.back()->set_black_border(borderWidth);
+
+    ROS_INFO_STREAM("Configuring for " << nThreads << " threads");
+    detectors_.back()->set_nthreads(nThreads);
+
   }
 
   nh_.param<int>("max_number_frames", maxFrameNumber_, 1000000);
@@ -166,15 +175,18 @@ void SyncAndDetect::processCVMat(const std::vector<std_msgs::Header> &headers,
       msg.header = headers[i];
       cv::imencode(".jpg", colorImg, msg.data, param);
 
-      if (headers[i].stamp.toSec() != 0)
-        outbag_.write<sensor_msgs::CompressedImage>(imageOutputTopics_[i],
-                                                    headers[i].stamp, msg);
+      // Writing out a (hidden!) bag of images is dumb
+      // Cut it out
+      // if (headers[i].stamp.toSec() != 0)
+      //   outbag_.write<sensor_msgs::CompressedImage>(imageOutputTopics_[i],
+      //                                               headers[i].stamp, msg);
+ 
       if (runOnline()) {
         imagePubs_[i].publish(msg);
       }
     }
   }
-  ROS_INFO_STREAM("frame " << fnum_ << " " << headers[0].stamp << " detected "
+  ROS_DEBUG_STREAM("frame " << fnum_ << " " << headers[0].stamp << " detected "
                            << totTags << " tags with " << grey.size()
                            << " cameras");
   fnum_++;
