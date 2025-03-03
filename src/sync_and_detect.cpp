@@ -93,7 +93,8 @@ bool SyncAndDetect::initialize() {
   int subQueueSize, pubQueueSize;
   nh_.param<int>("subscribe_queue_size", subQueueSize, 10);
   nh_.param<int>("publish_queue_size", pubQueueSize, 10);
-  nh_.param<bool>("parallelize_detection", parallelizeDetection_, true);
+  
+  nh_.param<bool>("detector_parallellize", parallelizeDetection_, true);
 
   nh_.param<std::string>("bag_file", bagFile_, "");
   std::string outfname;
