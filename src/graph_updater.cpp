@@ -131,10 +131,11 @@ void GraphUpdater::examine(
             TimeToVertexesMap::iterator it = oldFactors_.find(fp->getTime());
             if (it == oldFactors_.end()) {
               LOG_DEBUG("   first vertex at time: " << fp->getTime());
-              it = oldFactors_
-                     .insert(TimeToVertexesMap::value_type(
-                       fp->getTime(), VertexVec()))
-                     .first;
+              it =
+                oldFactors_
+                  .insert(
+                    TimeToVertexesMap::value_type(fp->getTime(), VertexVec()))
+                  .first;
             }
             auto & c = it->second;
             if (!contains(c, fv)) {
@@ -503,7 +504,7 @@ static bool try_initialization(
         // graph *before* it is optimized
         const auto errMap = subGraph.getErrorMap();
         for (const auto & ev : errMap) {
-          LOG_INFO(
+          LOG_DEBUG(
             "SUBGRAPH ERROR_MAP  " << ev.first << " "
                                    << *(subGraph.getVertex(ev.second)));
         }
@@ -631,11 +632,11 @@ bool GraphUpdater::applyFactorsToGraph(
   subgraphError_ += serr;
   const double err = optimize(graph, serr);
   if (err >= 0) {
-    LOG_INFO(
+    LOG_DEBUG(
       "[" << t << "] subgraph err: " << serr << ", subgraph sum: "
           << subgraphError_ << ", full graph error: " << err);
   } else {
-    LOG_INFO(
+    LOG_DEBUG(
       "[" << t << "] subgraph err: " << serr
           << ", subgraph sum: " << subgraphError_);
   }
@@ -675,7 +676,7 @@ void GraphUpdater::processNewFactors(
       break;
     }
   }
-  LOG_INFO("graph after update: " << graph->getStats());
+  LOG_DEBUG("graph after update: " << graph->getStats());
   profiler_.record("processNewFactors");
 }
 

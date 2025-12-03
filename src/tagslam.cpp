@@ -273,7 +273,8 @@ bool TagSLAM::initialize()
   // optimize the initial setup if necessary
   graph_->optimize(0);
   // open output files
-  tagCornerFile_.open("tag_corners.txt");
+  tagCornerFile_.open(outDir_ + "/tag_corners.txt");
+  LOG_INFO(outDir_ + "/tag_corners.txt");
   // make a deep copy of the initial graph now
   graph_.reset(initialGraph_->clone());
   return (true);
@@ -877,8 +878,9 @@ void TagSLAM::fakeOdom(uint64_t tCurr, std::vector<VertexDesc> * factors)
           body->getFakeOdomRotationNoise(),
           body->getFakeOdomTranslationNoise());
         const PoseWithNoise pwn(Transform::Identity(), pn, true);
-        factors->push_back(OdometryProcessor::add_body_pose_delta(
-          graph_.get(), tPrev, tCurr, body, pwn));
+        factors->push_back(
+          OdometryProcessor::add_body_pose_delta(
+            graph_.get(), tPrev, tCurr, body, pwn));
       }
     }
   }

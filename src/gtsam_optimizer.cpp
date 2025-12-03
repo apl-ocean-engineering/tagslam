@@ -107,9 +107,10 @@ std::shared_ptr<Cal3DS3> GTSAMOptimizer::getRadTanModel(
       dc[i - 2] = D[i];
     }
     it = radTanModelMap_
-           .insert(RadTanModelMap::value_type(
-             cname, std::shared_ptr<Cal3DS3>(
-                      new Cal3DS3(K[0], K[1], K[2], K[3], p1, p2, dc))))
+           .insert(
+             RadTanModelMap::value_type(
+               cname, std::shared_ptr<Cal3DS3>(
+                        new Cal3DS3(K[0], K[1], K[2], K[3], p1, p2, dc))))
            .first;
   }
   return (it->second);
@@ -128,9 +129,10 @@ std::shared_ptr<Cal3FS2> GTSAMOptimizer::getEquiModel(
       dc[i] = D[i];
     }
     it = equiModelMap_
-           .insert(EquiModelMap::value_type(
-             cname, std::shared_ptr<Cal3FS2>(new Cal3FS2(
-                      K[0], K[1], K[2], K[3], dc[0], dc[1], dc[2], dc[3]))))
+           .insert(
+             EquiModelMap::value_type(
+               cname, std::shared_ptr<Cal3FS2>(new Cal3FS2(
+                        K[0], K[1], K[2], K[3], dc[0], dc[1], dc[2], dc[3]))))
            .first;
   }
   return (it->second);
@@ -169,18 +171,20 @@ FactorKey GTSAMOptimizer::addRelativePosePrior(
   ValueKey key1, ValueKey key2, const PoseWithNoise & deltaPose)
 {
   // key1 = key2 * deltaPose
-  newGraph_.push_back(gtsam::BetweenFactor<gtsam::Pose3>(
-    key1, key2, gtsam_utils::to_gtsam(deltaPose.getPose()),
-    gtsam_utils::to_gtsam(deltaPose.getNoise())));
+  newGraph_.push_back(
+    gtsam::BetweenFactor<gtsam::Pose3>(
+      key1, key2, gtsam_utils::to_gtsam(deltaPose.getPose()),
+      gtsam_utils::to_gtsam(deltaPose.getNoise())));
   return (fullGraph_.size() + newGraph_.size() - 1);
 }
 
 FactorKey GTSAMOptimizer::addAbsolutePosePrior(
   ValueKey key, const PoseWithNoise & pwn)
 {
-  newGraph_.push_back(gtsam::PriorFactor<gtsam::Pose3>(
-    key, gtsam_utils::to_gtsam(pwn.getPose()),
-    gtsam_utils::to_gtsam(pwn.getNoise())));
+  newGraph_.push_back(
+    gtsam::PriorFactor<gtsam::Pose3>(
+      key, gtsam_utils::to_gtsam(pwn.getPose()),
+      gtsam_utils::to_gtsam(pwn.getNoise())));
   return (fullGraph_.size() + newGraph_.size() - 1);
 }
 
@@ -240,21 +244,24 @@ std::vector<FactorKey> GTSAMOptimizer::addTagProjectionFactor(
 
   auto pnit = pixelNoiseMap_.find(pixelNoise);
   if (pnit == pixelNoiseMap_.end()) {
-    pnit = pixelNoiseMap_
-             .insert(PixelNoiseMap::value_type(
-               pixelNoise, gtsam::noiseModel::Isotropic::Sigma(2, pixelNoise)))
-             .first;
+    pnit =
+      pixelNoiseMap_
+        .insert(
+          PixelNoiseMap::value_type(
+            pixelNoise, gtsam::noiseModel::Isotropic::Sigma(2, pixelNoise)))
+        .first;
   }
   for (int i = 0; i < 4; i++) {  // iterate over 4 corners
     const gtsam::Point2 imgPoint(imgCorners(i, 0), imgCorners(i, 1));
     gtsam::Expression<gtsam::Point3> X_o(objCorners.row(i));
     // transformFrom does X_A = T_AB * X_B
     // transformTo   does X_A = T_BA * X_B
-    gtsam::Expression<gtsam::Point2> xp = gtsam::project(gtsam::transformTo(
-      T_r_c_fac,
+    gtsam::Expression<gtsam::Point2> xp = gtsam::project(
       gtsam::transformTo(
-        T_w_r_fac, gtsam::transformFrom(
-                     T_w_b_fac, gtsam::transformFrom(T_b_o_fac, X_o)))));
+        T_r_c_fac,
+        gtsam::transformTo(
+          T_w_r_fac, gtsam::transformFrom(
+                       T_w_b_fac, gtsam::transformFrom(T_b_o_fac, X_o)))));
     switch (ci.getDistortionModel()) {
       case RADTAN: {
         auto distModel = getRadTanModel(camName, ci);
@@ -375,7 +382,7 @@ double GTSAMOptimizer::doOptimize(double deltaError)
     newGraph_.erase(newGraph_.begin(), newGraph_.end());
     newValues_.clear();
   } else {
-    LOG_INFO("optimizer: delta graph is 0!");
+    LOG_DEBUG("optimizer: delta graph is 0!");
   }
   return (hasValidError ? lastError_ : -1.0);
 }

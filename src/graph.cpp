@@ -241,7 +241,7 @@ void Graph::printUnoptimized() const
   for (auto v = boost::vertices(graph_); v.first != v.second; ++v.first) {
     const VertexConstPtr vp = graph_[*v.first];
     if (!isOptimized(*v.first)) {
-      LOG_INFO("unoptimized: " << vp->getLabel());
+      LOG_DEBUG("unoptimized: " << vp->getLabel());
     }
   }
 }
