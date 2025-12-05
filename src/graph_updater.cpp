@@ -557,12 +557,12 @@ double GraphUpdater::initializeSubgraphs(
         totalSGError += sgErr;
         graph_utils::initialize_from(graph, *bestGraph);
       } else {
-        LOG_WARN("dropping subgraph with error: " << sgErr << " " << maxErr);
+        LOG_INFO("dropping subgraph with error: " << sgErr << " " << maxErr);
       }
       // bestGraph->printErrorMap("BEST SUBGRAPH");
       profiler_.record("initializeFromSubgraphs");
     } else {
-      LOG_WARN("could not initialize subgraph!");
+      LOG_INFO("could not initialize subgraph!");
     }
   }
   return (totalSGError);
