@@ -319,12 +319,16 @@ void TagSLAM::openOutputBag(const string & bag_name)
     BOMB_OUT("cannot have wildcards in bag name!");
   }
   using Path = std::filesystem::path;
-  if (std::filesystem::exists(Path(bag_name) / Path("metadata.yaml"))) {
-    LOG_INFO("removing existing bag: " << bag_name);
-    std::filesystem::remove_all(bag_name);
+
+  // Construct the full path in the output directory
+  const string full_bag_path = outDir_ + "/" + bag_name;
+
+  if (std::filesystem::exists(Path(full_bag_path) / Path("metadata.yaml"))) {
+    LOG_INFO("removing existing bag: " << full_bag_path);
+    std::filesystem::remove_all(full_bag_path);
   }
 
-  outputBag_->open(bag_name);
+  outputBag_->open(full_bag_path);
   makeTopic(outputBag_.get(), "/tf2", "tf2_msgs/msg/TFMessage");
   struct rosbag2_storage::TopicMetadata md;
   for (const auto & body : bodies_) {
