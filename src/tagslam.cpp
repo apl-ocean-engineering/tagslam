@@ -188,7 +188,7 @@ TagPtr TagSLAM::addTag(int tagId, const std::shared_ptr<Body> & body) const
 
 void TagSLAM::readParams()
 {
-  outBagName_ = declare_parameter("out_bag", "output");
+  outBagName_ = declare_parameter("outbag", "output");
   playbackRate_ = declare_parameter("playback_rate", 5.0);
   outDir_ = declare_parameter("output_directory", ".");
   fixedFrame_ = declare_parameter<string>("fixed_frame_id", "map");
