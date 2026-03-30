@@ -73,12 +73,6 @@ int main(int argc, char ** argv)
     LOG_ERROR("cannot find input bag: " << in_uri);
   }
 
-  const std::string out_bag_name =
-    tagslam_node->get_parameter("out_bag").as_string();
-  const std::string out_dir =
-    tagslam_node->get_parameter("output_directory").as_string();
-  const std::string out_uri = out_dir + "/" + out_bag_name;
-
   const auto images = tagslam_node->getImageTopics();
   const auto tags = tagslam_node->getTagTopics();
   const auto odoms = tagslam_node->getOdomTopics();
@@ -117,23 +111,7 @@ int main(int argc, char ** argv)
 
   size_t num_frames =
     tagslam_node->get_parameter_or<int>("max_number_of_frames", 0);
-    LOG_INFO("Max Frames: " << num_frames);
-
-  std::shared_ptr<rosbag2_transport::Recorder> recorder_node;
-  if (!out_uri.empty()) {
-    LOG_INFO("writing detected tags to bag: " << out_uri);
-    rclcpp::NodeOptions recorder_options;
-    recorder_options.parameter_overrides(
-      {Parameter("storage.uri", out_uri),
-       Parameter("record.disable_keyboard_controls", true),
-       Parameter("record.topics", recorded_topics)});
-
-    recorder_node = std::make_shared<rosbag2_transport::Recorder>(
-      "rosbag_recorder", recorder_options);
-    exec.add_node(recorder_node);
-  } else {
-    LOG_INFO("no out_bag parameter set, publishing as messages!");
-  }
+  LOG_INFO("Max Frames: " << num_frames);
 
   while (player_node->play_next() && rclcpp::ok()) {
     exec.spin_some();

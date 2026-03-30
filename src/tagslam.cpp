@@ -187,7 +187,6 @@ TagPtr TagSLAM::addTag(int tagId, const std::shared_ptr<Body> & body) const
 }
 void TagSLAM::readParams()
 {
-  outBagName_ = declare_parameter("out_bag", "output");
   playbackRate_ = declare_parameter("playback_rate", 5.0);
   outDir_ = declare_parameter("output_directory", ".");
   fixedFrame_ = declare_parameter<string>("fixed_frame_id", "map");
@@ -374,13 +373,6 @@ void TagSLAM::doDump(bool optimize)
   for (auto & m : measurements_) {
     m->writeDiagnostics(graph_);
   }
-
-  openOutputBag(outBagName_);
-  writeToBag_ = true;
-  doReplay(0);  //  0 = playback at full speed
-  writeToBag_ = false;
-  outputBag_->close();
-  outputBag_.reset();
 
   profiler_.record("writeMeasurementDiagnostics");
   std::cout << profiler_ << std::endl;
@@ -997,8 +989,9 @@ void TagSLAM::writeFullCalibration(const string & fname) const
   std::ofstream f(fname);
   for (const auto & cam : cameras_) {
     Transform tf;
-    if (graph_utils::get_optimized_pose(
-          *graph_, 0, Graph::cam_name(cam->getName()), &tf)) {
+    if (
+      graph_utils::get_optimized_pose(
+        *graph_, 0, Graph::cam_name(cam->getName()), &tf)) {
       f << cam->getName() << ":" << std::endl;
       f << "  T_cam_body:" << std::endl;
       yaml_utils::write_matrix(f, "  ", tf.inverse());
@@ -1181,7 +1174,7 @@ void TagSLAM::processTags(
     std::unordered_set<int> tagsFound;
     for (const auto & tagPtr : tags) {
       // Find the corresponding detection to get corners
-      const Apriltag* tagDetection = nullptr;
+      const Apriltag * tagDetection = nullptr;
       for (const auto & det : tagMsgs[i]->detections) {
         if (det.id == tagPtr->getId()) {
           tagDetection = &det;
