@@ -185,10 +185,9 @@ TagPtr TagSLAM::addTag(int tagId, const std::shared_ptr<Body> & body) const
   graph_utils::add_tag(graph_.get(), *p);
   return (p);
 }
-
 void TagSLAM::readParams()
 {
-  outBagName_ = declare_parameter("outbag", "output");
+  outBagName_ = declare_parameter("out_bag", "output");
   playbackRate_ = declare_parameter("playback_rate", 5.0);
   outDir_ = declare_parameter("output_directory", ".");
   fixedFrame_ = declare_parameter<string>("fixed_frame_id", "map");
@@ -437,6 +436,33 @@ void TagSLAM::readGlobalParameters(const YAML::Node & config)
     yaml::parse<int>(config["tagslam_parameters"], "sync_queue_size", 100);
   minTagArea_ =
     yaml::parse<int>(config["tagslam_parameters"], "minimum_tag_area", 0);
+
+  // Read whitelist_tags from YAML
+  whitelistTags_ = yaml::parse_container<std::vector<int>>(
+    config, "whitelist_tags", std::vector<int>());
+  if (!whitelistTags_.empty()) {
+    std::stringstream ss;
+    ss << "Whitelist: ";
+    for (size_t i = 0; i < whitelistTags_.size(); ++i) {
+      ss << whitelistTags_[i];
+      if (i < whitelistTags_.size() - 1) ss << ", ";
+    }
+    LOG_INFO(ss.str());
+  }
+
+  // Read blacklist_tags from YAML
+  blacklistTags_ = yaml::parse_container<std::vector<int>>(
+    config, "blacklist_tags", std::vector<int>());
+  if (!blacklistTags_.empty()) {
+    std::stringstream ss;
+    ss << "Blacklist: ";
+    for (size_t i = 0; i < blacklistTags_.size(); ++i) {
+      ss << blacklistTags_[i];
+      if (i < blacklistTags_.size() - 1) ss << ", ";
+    }
+    LOG_INFO(ss.str());
+  }
+
   if (defbody.empty()) {
     LOG_WARN("no default body specified!");
   } else {
@@ -1085,13 +1111,43 @@ void TagSLAM::writeTagDiagnostics(const string & fname) const
 std::vector<TagConstPtr> TagSLAM::findTags(const std::vector<Apriltag> & ta)
 {
   std::vector<TagConstPtr> tpv;
+
+  const bool hasWhitelist = !whitelistTags_.empty();
+  const bool hasBlacklist = !blacklistTags_.empty();
+
+  // Use sets for O(1) average lookup time
+  std::unordered_set<int> blacklistedTags;
+  std::unordered_set<int> whitelistedTags;
+
+  if (hasBlacklist) {
+    blacklistedTags.insert(blacklistTags_.begin(), blacklistTags_.end());
+  }
+  if (hasWhitelist) {
+    whitelistedTags.insert(whitelistTags_.begin(), whitelistTags_.end());
+  }
+
   for (const auto & tag : ta) {
-    TagConstPtr tagPtr = findTag(tag.id);
+    const int tag_id = tag.id;
+
+    // Blacklist Check: Skip if tag is blacklisted
+    if (hasBlacklist && blacklistedTags.count(tag_id) != 0) {
+      continue;
+    }
+
+    // Whitelist Check: If whitelist exists, only allow tags in it
+    if (hasWhitelist && whitelistedTags.count(tag_id) == 0) {
+      LOG_INFO("Skipping tag " << tag_id << " (not in whitelist)");
+      continue;
+    }
+
+    // Tag passed whitelist/blacklist checks, try to find it
+    TagConstPtr tagPtr = findTag(tag_id);
     if (tagPtr) {
       tpv.push_back(tagPtr);
     }
   }
-  return (tpv);
+
+  return tpv;
 }
 
 void TagSLAM::processTags(
@@ -1120,14 +1176,25 @@ void TagSLAM::processTags(
       VertexDesc v = fac->addToGraph(fac, graph_.get());
       sortedFactors.insert(MMap::value_type(1e10, v));
     }
+
+    // Use the filtered tags instead of raw detections
     std::unordered_set<int> tagsFound;
-    for (const auto & tag : tagMsgs[i]->detections) {
-      TagConstPtr tagPtr = findTag(tag.id);
-      if (!tagPtr) {
+    for (const auto & tagPtr : tags) {
+      // Find the corresponding detection to get corners
+      const Apriltag* tagDetection = nullptr;
+      for (const auto & det : tagMsgs[i]->detections) {
+        if (det.id == tagPtr->getId()) {
+          tagDetection = &det;
+          break;
+        }
+      }
+
+      if (!tagDetection) {
         continue;
       }
-      if (tagsFound.count(tag.id) == 0) {
-        const auto * corners = &(tag.corners[0]);
+
+      if (tagsFound.count(tagPtr->getId()) == 0) {
+        const auto * corners = &(tagDetection->corners[0]);
         TagProjectionFactorPtr fp(new factor::TagProjection(
           t, cam, tagPtr, corners, graphUpdater_.getPixelNoise(),
           cam->getName() + "-" + Graph::tag_name(tagPtr->getId())));
@@ -1141,14 +1208,15 @@ void TagSLAM::processTags(
         }
         sortedFactors.insert(MMap::value_type(sz, fac));
         writeTagCorners(t, cam->getIndex(), tagPtr, corners);
-        tagsFound.insert(tag.id);
+        tagsFound.insert(tagPtr->getId());
       } else {
-        LOG_ERROR("dropping DUPLICATE TAG: " << tag.id);
+        LOG_ERROR("dropping DUPLICATE TAG: " << tagPtr->getId());
       }
     }
+
     std::stringstream ss;
-    for (const auto & tag : tagMsgs[i]->detections) {
-      ss << " " << tag.id;
+    for (const auto & tagPtr : tags) {
+      ss << " " << tagPtr->getId();
     }
     LOG_WARN(
       "frame " << frameNum_ << " [" << t << "] cam: " << cam->getName()
@@ -1158,7 +1226,6 @@ void TagSLAM::processTags(
     factors->push_back(it->second);
   }
 }
-
 void TagSLAM::remapAndSquash(
   uint64_t t, std::vector<TagArrayConstPtr> * remapped,
   const std::vector<TagArrayConstPtr> & orig)

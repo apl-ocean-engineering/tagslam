@@ -187,7 +187,8 @@ private:
     return (rclcpp::Time(t, this->get_clock()->get_clock_type()));
   }
   // ------ variables --------
-
+  std::vector<int> whitelistTags_;
+  std::vector<int> blacklistTags_;
   rclcpp::Node * node_{nullptr};
   TagMap tagMap_;
   std::shared_ptr<Body> defaultBody_;

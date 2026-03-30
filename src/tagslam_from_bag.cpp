@@ -62,7 +62,6 @@ int main(int argc, char ** argv)
   const auto recorded_topics = tagslam_node->getPublishedTopics();
   printTopics("recorded topics", recorded_topics);
 
-
   const std::string in_uri =
     tagslam_node->declare_parameter<std::string>("in_bag", "");
   if (in_uri.empty()) {
@@ -73,6 +72,12 @@ int main(int argc, char ** argv)
   if (!std::filesystem::exists(in_uri)) {
     LOG_ERROR("cannot find input bag: " << in_uri);
   }
+
+  const std::string out_bag_name =
+    tagslam_node->get_parameter("out_bag").as_string();
+  const std::string out_dir =
+    tagslam_node->get_parameter("output_directory").as_string();
+  const std::string out_uri = out_dir + "/" + out_bag_name;
 
   const auto images = tagslam_node->getImageTopics();
   const auto tags = tagslam_node->getTagTopics();
@@ -110,8 +115,6 @@ int main(int argc, char ** argv)
     LOG_ERROR("odom topics not in bag, tagslam may hang!");
   }
 
-  const std::string out_uri =
-    tagslam_node->declare_parameter<std::string>("out_bag", "");
   size_t num_frames =
     tagslam_node->get_parameter_or<int>("max_number_of_frames", 0);
     LOG_INFO("Max Frames: " << num_frames);

@@ -562,7 +562,7 @@ double GraphUpdater::initializeSubgraphs(
       // bestGraph->printErrorMap("BEST SUBGRAPH");
       profiler_.record("initializeFromSubgraphs");
     } else {
-      LOG_INFO("could not initialize subgraph!");
+      LOG_DEBUG("could not initialize subgraph!");
     }
   }
   return (totalSGError);
